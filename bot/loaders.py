@@ -74,6 +74,7 @@ def parse_chain_frame(raw: pd.DataFrame, trade_date: pd.Timestamp) -> dict:
         "em_straddle": expected_move(quotes, spot),
         "em_tradestation": float(m[1]) if m else float("nan"),
         "gex_bn": g["total_bn"],
+        "gex_ratio": g["total_bn"] / g["gross_bn"] if g["gross_bn"] else float("nan"),  # neto / total, entre -1 y 1
         "call_wall_gex": g["call_wall"],
         "put_wall_gex": g["put_wall"],
         "call_wall_oi": float(z.loc[z["oi_c"].idxmax(), "strike"]),

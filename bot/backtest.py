@@ -18,7 +18,8 @@ from .validate import validate_bars, validate_days
 
 
 def skip_reason(day: pd.Series, p: Params) -> str | None:
-    if not day["gex_bn"] > p.gex_min_bn:
+    col = "gex_ratio" if p.gex_metric == "ratio" else "gex_bn"
+    if not day[col] > p.gex_min:
         return "gamma_negativo_o_choppy"
     if not day["em_pts"] >= p.min_expected_move_pts:
         return "movimiento_esperado_bajo"

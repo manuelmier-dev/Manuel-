@@ -20,6 +20,7 @@ def gamma_exposure(chain: pd.DataFrame, spot: float) -> dict:
     net = c.groupby("strike")["gex"].sum()
     return {
         "total_bn": float(net.sum()) / 1e9,
+        "gross_bn": float(c["gex"].abs().sum()) / 1e9,
         "call_wall": float(calls.idxmax()) if len(calls) else float("nan"),
         "put_wall": float(puts.idxmin()) if len(puts) else float("nan"),
         "per_strike": net,

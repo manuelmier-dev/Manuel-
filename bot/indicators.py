@@ -1,4 +1,6 @@
 """VWAP (con bandas), Bollinger y RSI. Todos usan solo barras pasadas y la actual."""
+from datetime import time
+
 import numpy as np
 import pandas as pd
 
@@ -20,9 +22,12 @@ def add_indicators(bars: pd.DataFrame, p: Params) -> pd.DataFrame:
     df = bars.copy()
     day = df.index.date
     tp = (df["high"] + df["low"] + df["close"]) / 3
-    vol = df["volume"]
+    # el VWAP arranca a las 9:30 NY; las barras de pre-mercado no cuentan
+    t = df.index.time
+    rth = np.array([time(9, 30) <= x <= time(16, 0) for x in t])
+    vol = df["volume"].where(rth, 0.0)
     g = pd.Series(day, index=df.index)
-    cv = vol.groupby(g).cumsum()
+    cv = vol.groupby(g).cumsum().replace(0, np.nan)
     vwap = (tp * vol).groupby(g).cumsum() / cv
     var = ((tp**2) * vol).groupby(g).cumsum() / cv - vwap**2
     sd = np.sqrt(var.clip(lower=0))

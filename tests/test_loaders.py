@@ -3,6 +3,11 @@ import unittest
 import numpy as np
 import pandas as pd
 
+from datetime import time
+
+from bot.days import build_days
+from bot.indicators import add_indicators
+from bot.config import Params
 from bot.loaders import date_from_filename, parse_chain_frame
 
 
@@ -44,6 +49,47 @@ class TestLoaders(unittest.TestCase):
         sheet.iloc[2, 0] = "sin encabezado"
         out = parse_chain_frame(sheet, pd.Timestamp(2026, 10, 13))
         self.assertTrue(np.isnan(out["em_tradestation"]))
+
+
+class TestDays(unittest.TestCase):
+    def _bars(self):
+        idx = pd.date_range("2024-01-03 08:00", "2024-01-03 10:00", freq="5min", tz="America/New_York")
+        close = pd.Series(np.linspace(7800, 7830, len(idx)), index=idx)
+        return pd.DataFrame({"open": close, "high": close, "low": close, "close": close, "volume": 100.0})
+
+    def test_build_days_uses_tradestation_em_and_oi_walls(self):
+        summ = pd.DataFrame([parse_chain_frame(fake_sheet(), pd.Timestamp(2024, 1, 3).replace(year=2026, month=10, day=13))])
+        summ["date"] = pd.Timestamp(2024, 1, 3)
+        days, skipped = build_days(summ, self._bars())
+        self.assertEqual(skipped, [])
+        row = days.iloc[0]
+        self.assertEqual(row["em_pts"], 22.83)
+        self.assertEqual(row["call_wall"], summ.iloc[0]["call_wall_oi"])
+        # la barra de las 9:15 cierra a las 9:20; base = su cierre - SPX del archivo
+        bar = self._bars().loc["2024-01-03 09:15", "close"]
+        self.assertAlmostEqual(row["basis"], bar - summ.iloc[0]["spot"])
+
+    def test_em_falls_back_to_straddle(self):
+        summ = pd.DataFrame([parse_chain_frame(fake_sheet(em_header="x"), pd.Timestamp(2026, 10, 13))])
+        summ["date"] = pd.Timestamp(2024, 1, 3)
+        days, _ = build_days(summ, self._bars())
+        self.assertEqual(days.iloc[0]["em_pts"], summ.iloc[0]["em_straddle"])
+
+    def test_skips_day_without_premarket_bar(self):
+        summ = pd.DataFrame([parse_chain_frame(fake_sheet(), pd.Timestamp(2026, 10, 13))])
+        summ["date"] = pd.Timestamp(2024, 1, 3)
+        rth_only = self._bars().between_time("09:30", "10:00")
+        days, skipped = build_days(summ, rth_only)
+        self.assertTrue(days.empty)
+        self.assertEqual(len(skipped), 1)
+
+    def test_vwap_ignores_premarket(self):
+        idx = pd.date_range("2024-01-03 08:00", "2024-01-03 10:00", freq="5min", tz="America/New_York")
+        px = np.where(idx.time < time(9, 30), 5000.0, 7800.0)
+        b = pd.DataFrame({"open": px, "high": px, "low": px, "close": px, "volume": 100.0}, index=idx)
+        out = add_indicators(b, Params())
+        self.assertTrue(out.loc[idx.time < time(9, 30), "vwap"].isna().all())
+        self.assertEqual(out.loc["2024-01-03 09:30", "vwap"], 7800.0)
 
 
 if __name__ == "__main__":

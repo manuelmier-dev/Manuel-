@@ -12,10 +12,11 @@ if __name__ == "__main__":
     pd.set_option("display.width", 200, "display.max_columns", 30)
     if not df.empty:
         df.to_csv(out, index=False)
-        print(df.drop(columns=["file", "strike_min", "strike_max"]).round(2).to_string(index=False))
+        print(df.drop(columns=["file", "strike_min", "strike_max", "call_wall_gex", "put_wall_gex"]).round(2).to_string(index=False))
         print(f"\nArchivos leídos: {len(df)}  |  guardado en {out}")
         print(f"GEX dentro de ±0.5 mil millones: {int((df['gex_bn'].abs() <= 0.5).sum())} días")
         print(f"GEX negativo: {int((df['gex_bn'] < 0).sum())} días")
+        print(f"Proporción neto/total dentro de ±0.5: {int((df['gex_ratio'].abs() <= 0.5).sum())} días | mayor a 0.5: {int((df['gex_ratio'] > 0.5).sum())} días")
     for e in errors:
         print("ERROR:", e)
     if df.empty:

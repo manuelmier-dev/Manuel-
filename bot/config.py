@@ -5,7 +5,8 @@ from datetime import time
 @dataclass(frozen=True)
 class Params:
     # Filtros del día (se evalúan con datos disponibles ANTES de las 9:30 NY)
-    gex_min_bn: float = 0.5            # GEX total debe ser > 0.5 mil millones; negativo o dentro de ±0.5 = no operar
+    gex_metric: str = "bn"             # "bn" (mil millones de USD) o "ratio" (neto/total, entre -1 y 1). POR CONFIRMAR con Manuel
+    gex_min: float = 0.5               # solo se opera si la métrica elegida es > gex_min; negativo o dentro de ±gex_min = no operar
     min_expected_move_pts: float = 20.0
 
     # Salidas, como fracción del movimiento esperado (EM)

@@ -35,3 +35,12 @@ Claves y datos nunca van al repositorio (`.env` y `data/` están ignorados).
 precio del SPX (por paridad put-call), movimiento esperado (straddle **y** el de TradeStation), GEX total y walls
 (por GEX y por Open Interest). No decide nada: muestra las alternativas para elegir con datos.
 Límites vistos en el archivo real: solo ~30 strikes (±70 pts), gamma redondeada a 3 decimales, sin precio del índice ni de ES.
+
+## Tabla de días y decisiones de Manuel (13-oct-2026)
+- Movimiento esperado = el de TradeStation (encabezado del archivo); si falta, el straddle.
+- Wall inicial = mayor Open Interest.
+- `bot.days.build_days(resumen, barras_ES)` arma la tabla del backtest. Las barras de ES deben incluir pre-mercado
+  (la base ES − SPX se toma a las 9:20 NY). RSI y Bollinger se calculan sobre todas las barras; el VWAP arranca a las 9:30.
+- Filtro de gamma: `Params.gex_metric` = `"bn"` (mil millones, tal cual) o `"ratio"` (neto/total, entre -1 y 1). **Por confirmar.**
+  Ejemplo real: el 13-oct el GEX fue +8.08 mil millones (pasa el filtro) pero la proporción fue 0.21 (queda en zona "choppy").
+- `quantconnect/export_es_bars.py`: borrador (no probado) para sacar las barras de ES desde QuantConnect.
