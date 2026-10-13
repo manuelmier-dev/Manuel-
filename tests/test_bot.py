@@ -75,7 +75,9 @@ class TestDayFilter(unittest.TestCase):
         ok = pd.Series({"gex_bn": 1.0, "em_pts": 40.0})
         self.assertIsNone(skip_reason(ok, p))
         self.assertIsNotNone(skip_reason(pd.Series({"gex_bn": -2.0, "em_pts": 40.0}), p))
-        self.assertIsNotNone(skip_reason(pd.Series({"gex_bn": 0.3, "em_pts": 40.0}), p))
+        self.assertIsNone(skip_reason(pd.Series({"gex_bn": 0.3, "em_pts": 40.0}), p))       # ya no hay banda de ±0.5
+        self.assertIsNotNone(skip_reason(pd.Series({"gex_bn": -0.1, "em_pts": 40.0}), p))   # gamma negativo: no operar
+        self.assertIsNotNone(skip_reason(pd.Series({"gex_bn": 0.3, "em_pts": 40.0}), Params(gex_min=0.5)))
         self.assertIsNotNone(skip_reason(pd.Series({"gex_bn": 1.0, "em_pts": 15.0}), p))
 
 

@@ -3,8 +3,8 @@
 Fase 1: cálculo de GEX/walls/movimiento esperado y backtest. **No opera con dinero.**
 
 ## Reglas implementadas (de Manuel)
-- Se opera solo si GEX total > **0.5** (miles de millones) y movimiento esperado (EM) ≥ **20** pts.
-  GEX negativo o entre -0.5 y 0.5 = no operar.
+- Se opera solo si el GEX total es **positivo** y el movimiento esperado (EM) ≥ **20** pts.
+  La banda de ±0.5 se descartó (Manuel, 13-oct); sigue disponible con `Params(gex_min=0.5)`.
 - Zona: wall de gamma (call wall → corto, put wall → largo), entre 9:30 y 10:30 NY.
 - Confirmación: al menos **2 de 3** (VWAP ±2σ, Bollinger 20/2, RSI 14 en 70/30). Ajustable en `bot/config.py`.
 - Salida: 90% del EM o el wall contrario (lo que llegue primero). Stop: 20% del EM.
@@ -41,6 +41,6 @@ Límites vistos en el archivo real: solo ~30 strikes (±70 pts), gamma redondead
 - Wall inicial = mayor Open Interest.
 - `bot.days.build_days(resumen, barras_ES)` arma la tabla del backtest. Las barras de ES deben incluir pre-mercado
   (la base ES − SPX se toma a las 9:20 NY). RSI y Bollinger se calculan sobre todas las barras; el VWAP arranca a las 9:30.
-- Filtro de gamma: `Params.gex_metric` = `"bn"` (mil millones, tal cual) o `"ratio"` (neto/total, entre -1 y 1). **Por confirmar.**
+- Filtro de gamma (solo signo por defecto): `Params.gex_metric` = `"bn"` (mil millones, tal cual) o `"ratio"` (neto/total, entre -1 y 1). **Por confirmar.**
   Ejemplo real: el 13-oct el GEX fue +8.08 mil millones (pasa el filtro) pero la proporción fue 0.21 (queda en zona "choppy").
 - `quantconnect/export_es_bars.py`: borrador (no probado) para sacar las barras de ES desde QuantConnect.
