@@ -46,3 +46,11 @@ Límites vistos en el archivo real: solo ~30 strikes (±70 pts), gamma redondead
 - Filtro de gamma (solo signo por defecto): `Params.gex_metric` = `"bn"` (mil millones, tal cual) o `"ratio"` (neto/total, entre -1 y 1). **Por confirmar.**
   Ejemplo real: el 13-oct el GEX fue +8.08 mil millones (pasa el filtro) pero la proporción fue 0.21 (queda en zona "choppy").
 - `quantconnect/export_es_bars.py`: borrador (no probado) para sacar las barras de ES desde QuantConnect.
+
+## Bitácora diaria (una fila por día, opere o no)
+`python -m bot.make_journal "<carpeta de cadenas>" [barras_es.csv|-] [bitacora.csv]`
+- Antes de la apertura: régimen (`reversion` si GEX > 0, `tendencia` si no), gamma, EM, walls, si el bot opera y por qué no.
+- Después del cierre (con barras de ES de 5 min con zona NY): rango, movimiento, hora del máximo y mínimo, y si caen entre 9:30 y 10:30.
+- Imprime la prueba de la observación de Manuel (máximo o mínimo entre 9:30 y 10:30) y compara los dos regímenes.
+- Una sesión con menos de 70 barras se ignora, para no mezclar días incompletos.
+- Programarlo a diario (cron) depende de de dónde salgan las barras de ES; por eso aún no está programado.
