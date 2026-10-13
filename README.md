@@ -29,3 +29,9 @@ Fase 1: cálculo de GEX/walls/movimiento esperado y backtest. **No opera con din
 python -m unittest discover -s tests -v
 ```
 Claves y datos nunca van al repositorio (`.env` y `data/` están ignorados).
+
+## Cadenas SPX 0DTE de TradeStation (.xls)
+`python -m bot.inspect_chains "<carpeta con los .xls>" [salida.csv]` lee todos los archivos y resume cada día:
+precio del SPX (por paridad put-call), movimiento esperado (straddle **y** el de TradeStation), GEX total y walls
+(por GEX y por Open Interest). No decide nada: muestra las alternativas para elegir con datos.
+Límites vistos en el archivo real: solo ~30 strikes (±70 pts), gamma redondeada a 3 decimales, sin precio del índice ni de ES.
