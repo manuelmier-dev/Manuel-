@@ -1,0 +1,29 @@
+{ ExportBarras5min
+  Indicador de EasyLanguage: escribe cada barra de la gráfica en un archivo CSV.
+  *** NO PROBADO: Claude no puede ejecutar TradeStation. Si el verificador marca un error, mándalo tal cual
+  *** (con una captura) y se corrige en minutos.
+
+  Uso: gráfica de @ES a 5 minutos, con horario extendido (que se vea la madrugada), rango del 1-ago-2026 a hoy.
+  Antes crea la carpeta C:\TS_Export en Windows. Inserta el indicador en la gráfica; el archivo queda en FilePath.
+  Cada barra se escribe con su HORA DE CIERRE (así numera TradeStation) y la fecha en formato EasyLanguage
+  (1261013 = 13-oct-2026). El programa de Python ya sabe leer eso. }
+
+inputs:
+	FilePath( "C:\TS_Export\ES_5min.csv" );
+
+variables:
+	OK( false ),
+	Linea( "" );
+
+once
+begin
+	OK = FileDelete( FilePath );
+	OK = FileAppend( FilePath, "fecha_el,hora_cierre,open,high,low,close,volume" + NewLine );
+end;
+
+Linea = NumToStr( Date, 0 ) + "," + NumToStr( Time, 0 ) + "," +
+	NumToStr( Open, 2 ) + "," + NumToStr( High, 2 ) + "," +
+	NumToStr( Low, 2 ) + "," + NumToStr( Close, 2 ) + "," +
+	NumToStr( Volume, 0 ) + NewLine;
+
+OK = FileAppend( FilePath, Linea );

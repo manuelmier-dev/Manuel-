@@ -54,3 +54,13 @@ Límites vistos en el archivo real: solo ~30 strikes (±70 pts), gamma redondead
 - Imprime la prueba de la observación de Manuel (máximo o mínimo entre 9:30 y 10:30) y compara los dos regímenes.
 - Una sesión con menos de 70 barras se ignora, para no mezclar días incompletos.
 - Programarlo a diario (cron) depende de de dónde salgan las barras de ES; por eso aún no está programado.
+
+## Barras de ES desde TradeStation (EasyLanguage)
+`tradestation/ExportBarras5min.txt` (NO PROBADO en TradeStation): indicador que escribe cada barra de la gráfica en `C:\TS_Export\ES_5min.csv`.
+- Gráfica de `@ES` a 5 min, con horario extendido, del 1-ago-2026 a hoy. Crear antes la carpeta `C:\TS_Export`.
+- TradeStation numera las barras por hora de **cierre** y la fecha como `1261013` (13-oct-2026). `bot/tsbars.py` lo convierte a hora de inicio, zona Nueva York.
+- Comprueba la zona horaria con el volumen (la barra de las 9:30 debe ser la de más volumen en ≥ 50% de los días) y descarta días con base ES−SPX fuera de [-30, 150] pts (señal de precios ajustados).
+
+## Backtest completo
+`python -m bot.run_backtest "<carpeta de cadenas>" "<barras de ES .csv>" [operaciones.csv]`
+Con pocos días no concluye nada; sirve para encontrar errores y ver el comportamiento por primera y segunda entrada.

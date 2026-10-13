@@ -20,13 +20,17 @@ def build_days(summary: pd.DataFrame, es_bars: pd.DataFrame, snapshot: time = ti
         if done.empty or ts - done.index[-1] > pd.Timedelta(minutes=max_gap_min):
             skipped.append(f"{d.date()}: no hay barra de ES cerca de las {snapshot:%H:%M}")
             continue
+        basis = float(done["close"].iloc[-1]) - float(r["spot"])
+        if not -30 <= basis <= 150:
+            skipped.append(f"{d.date()}: base ES-SPX de {basis:.0f} pts fuera de lo normal (¿precios ajustados o zona horaria?)")
+            continue
         em = r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_straddle"]
         rows.append({
             "date": d.date(),
             "gex_bn": r["gex_bn"], "gex_ratio": r["gex_ratio"],
             "em_pts": float(em),
             "call_wall": r["call_wall_oi"], "put_wall": r["put_wall_oi"],
-            "basis": float(done["close"].iloc[-1]) - float(r["spot"]),
+            "basis": basis,
             "oi_date": (d - pd.tseries.offsets.BDay(1)).date(),  # OI del día hábil anterior
         })
     out = pd.DataFrame(rows)

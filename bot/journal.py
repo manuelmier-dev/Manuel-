@@ -23,6 +23,11 @@ POST_COLS = ["es_open", "es_high", "es_low", "es_close", "range_pts", "range_em"
 
 def load_es_bars_csv(path) -> pd.DataFrame:
     """CSV con el tiempo en la primera columna y open, high, low, close, volume (el de export_es_bars.py)."""
+    with open(path, encoding="utf-8") as f:
+        first = f.readline()
+    if first.startswith("fecha_el"):          # exportado desde TradeStation con ExportBarras5min
+        from .tsbars import load_tradestation_bars_csv
+        return load_tradestation_bars_csv(path)
     df = pd.read_csv(path, index_col=0)
     df.index = pd.to_datetime(df.index, utc=True).tz_convert(NY)
     return df.sort_index()
