@@ -5,6 +5,8 @@ Fase 1: cálculo de GEX/walls/movimiento esperado y backtest. **No opera con din
 ## Reglas implementadas (de Manuel)
 - Se opera solo si el GEX total es **positivo** y el movimiento esperado (EM) ≥ **20** pts.
   La banda de ±0.5 se descartó (Manuel, 13-oct); sigue disponible con `Params(gex_min=0.5)`.
+  Gamma negativo = día de tendencia: se registra como `gamma_negativo_tendencia` y no se opera, porque
+  requiere otra estrategia (fase posterior). Primero se prueba la reversión a la media en los días de gamma positivo.
 - Zona: wall de gamma (call wall → corto, put wall → largo), entre 9:30 y 10:30 NY.
 - Confirmación: al menos **2 de 3** (VWAP ±2σ, Bollinger 20/2, RSI 14 en 70/30). Ajustable en `bot/config.py`.
 - Salida: 90% del EM o el wall contrario (lo que llegue primero). Stop: 20% del EM.

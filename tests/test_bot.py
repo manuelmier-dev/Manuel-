@@ -129,7 +129,7 @@ class TestBacktest(unittest.TestCase):
         d["gex_bn"] = -1.0
         trades, skipped = run_backtest(b, d, P)
         self.assertTrue(trades.empty)
-        self.assertEqual(skipped.iloc[0]["reason"], "gamma_negativo_o_choppy")
+        self.assertEqual(skipped.iloc[0]["reason"], "gamma_negativo_tendencia")
 
     def test_entry_uses_next_bar_open_not_signal_bar(self):
         b, d = scenario([5030, 5015, 5004, 5000])
