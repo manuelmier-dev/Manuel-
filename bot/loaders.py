@@ -197,6 +197,9 @@ def load_chain_file(path, allow_late: bool = False) -> dict:
 
 def summarize_folder(folder, patterns=("**/*.xls", "**/*.csv")) -> tuple[pd.DataFrame, list[str]]:
     """Resume todos los archivos; los que fallan se reportan, no se ocultan. Si hay dos del mismo día, queda el más tardío válido."""
+    if (Path(folder) / "theta_resumen.csv").exists():          # carpeta bajada con bot.theta_download
+        from .theta_download import load_theta_folder
+        return load_theta_folder(folder)
     rows, errors = [], []
     files = sorted({f for p in patterns for f in Path(folder).glob(p)})
     for f in files:

@@ -105,3 +105,12 @@ Ver `REGLAS.md`. `python -m bot.run_backtest` ahora separa en el reporte lo post
 - Falta (necesita ejemplos reales de la API): el código que consulta Theta. Ventana recomendada: desde mayo de 2022, cuando las 0DTE pasaron a ser diarias.
 - Validación obligatoria antes de usar años: recalcular con Theta los ~40 días que ya se tienen de TradeStation y comparar Open Interest, spot, GEX y walls.
 - ES (barras de 5 min con pre-mercado) saldrá de la API de TradeStation (sin costo), no de Theta ni de QuantConnect.
+
+## Descarga de la historia desde Theta (14-oct-2026) — NO PROBADO contra la API real
+Investigación (documentación pública de Theta): API REST v3 en `http://127.0.0.1:25503/v3`; Theta Terminal v3 pide Java 21+ y `creds.txt` junto al .jar;
+una sola sesión por cuenta e IP fija (errores 476/478); plan Standard con 2 hilos de servidor (una solicitud a la vez);
+`/option/at_time/quote` da la última cotización NBBO a la hora pedida (usar horas redondas); el Open Interest lo publica OPRA ~06:30 ET y es el cierre previo.
+- `python -m bot.theta_probe`: prueba corta; guarda en `theta_probe/` las respuestas reales (símbolo, expiraciones, cotización y OI, fecha reciente y antigua).
+- `python -m bot.theta_download <salida> <desde> <hasta>`: un día por vez, reanuda, registra errores en `theta_errores.csv`, se detiene si hay conflicto de sesión.
+- `bot.run_backtest`, `bot.sweep` y `bot.make_journal` aceptan esa carpeta en lugar de la de archivos de TradeStation.
+- Correr fuera del horario de mercado, y con un solo Theta Terminal activo.
