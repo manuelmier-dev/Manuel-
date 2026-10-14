@@ -20,7 +20,11 @@ def _side(df: pd.DataFrame, right: str, cols: list[str]) -> pd.DataFrame:
     return x.set_index("strike")[cols].add_suffix("_" + right.lower())
 
 
-def summary_from_theta(trade_date: pd.Timestamp, quotes: pd.DataFrame, oi: pd.DataFrame, snapshot_et: str = "09:20") -> dict:
+RAW_COLS = ["strike", "bid_c", "ask_c", "bid_p", "ask_p", "oi_c", "oi_p"]
+
+
+def build_table(quotes: pd.DataFrame, oi: pd.DataFrame) -> pd.DataFrame:
+    """Une cotizaciones y Open Interest por strike (sin calcular nada): es lo que se guarda en crudo para poder recalcular sin la API."""
     q = quotes.copy()
     q["bid"] = pd.to_numeric(q["bid"], errors="coerce")
     q["ask"] = pd.to_numeric(q["ask"], errors="coerce")
@@ -29,11 +33,22 @@ def summary_from_theta(trade_date: pd.Timestamp, quotes: pd.DataFrame, oi: pd.Da
          .join(_side(oi, "C", ["open_interest"]), how="outer").join(_side(oi, "P", ["open_interest"]), how="outer"))
     z = z.rename(columns={"open_interest_c": "oi_c", "open_interest_p": "oi_p"}).reset_index()
     z[["oi_c", "oi_p"]] = z[["oi_c", "oi_p"]].fillna(0)
+    return z.sort_values("strike").reset_index(drop=True)[RAW_COLS]
+
+
+def summary_from_table(trade_date: pd.Timestamp, raw: pd.DataFrame, snapshot_et: str = "09:20") -> dict:
+    z = raw.copy()
     z["mid_c"] = (z["bid_c"] + z["ask_c"]) / 2
     z["mid_p"] = (z["bid_p"] + z["ask_p"]) / 2
-    z = z.sort_values("strike").reset_index(drop=True)
     if z.dropna(subset=["mid_c", "mid_p"]).empty:
         raise ValueError("Sin cotizaciones válidas de call y put en el mismo strike")
     out = _summarize(z, pd.Timestamp(trade_date), snapshot_et, float("nan"), "estimada")
     out["fuente"] = "theta"
+    return out
+
+
+def summary_from_theta(trade_date: pd.Timestamp, quotes: pd.DataFrame, oi: pd.DataFrame, snapshot_et: str = "09:20") -> dict:
+    raw = build_table(quotes, oi)
+    out = summary_from_table(trade_date, raw, snapshot_et)
+    out["_raw"] = raw
     return out

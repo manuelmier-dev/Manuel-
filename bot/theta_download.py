@@ -12,7 +12,7 @@ import pandas as pd
 
 from .theta_client import (ThetaError, at_time_quote, fetch_text, list_expirations, normalize_oi, normalize_quotes,
                            open_interest)
-from .theta_snapshot import summary_from_theta
+from .theta_snapshot import summary_from_table, summary_from_theta
 
 MIN_STRIKES = 20
 
@@ -26,6 +26,7 @@ def expiration_days(symbol: str, fetch=fetch_text) -> list[pd.Timestamp]:
 def download_range(out_dir, start, end, symbol: str = "SPXW", fetch=fetch_text, pause: float = 0.3, log=print) -> dict:
     out = Path(out_dir)
     (out / "tables").mkdir(parents=True, exist_ok=True)
+    (out / "raw").mkdir(exist_ok=True)
     resumen, errores = out / "theta_resumen.csv", out / "theta_errores.csv"
     days = [d for d in expiration_days(symbol, fetch) if pd.Timestamp(start) <= d <= pd.Timestamp(end) and d.weekday() < 5]
     done = ok = failed = 0
@@ -40,6 +41,7 @@ def download_range(out_dir, start, end, symbol: str = "SPXW", fetch=fetch_text, 
             row = summary_from_theta(d, q, oi)
             if row["n_strikes"] < MIN_STRIKES:
                 raise ValueError(f"solo {row['n_strikes']} strikes con cotización válida")
+            row.pop("_raw").to_csv(out / "raw" / f"{d.date()}.csv", index=False)   # cotizaciones+OI en crudo: permite recalcular sin la API
             row.pop("_table").to_csv(table_path, index=False)          # la tabla se guarda al final: si algo falla, el día se reintenta
             pd.DataFrame([row]).to_csv(resumen, mode="a", header=not resumen.exists(), index=False)
             ok += 1
@@ -57,6 +59,18 @@ def download_range(out_dir, start, end, symbol: str = "SPXW", fetch=fetch_text, 
     return {"dias": len(days), "nuevos": ok, "fallidos": failed, "ya_hechos": done}
 
 
+def recompute_from_raw(folder) -> int:
+    """Rehace theta_resumen.csv y tables/ desde raw/ SIN llamar a la API (después de corregir el método de cálculo)."""
+    f = Path(folder)
+    rows = []
+    for p in sorted((f / "raw").glob("*.csv")):
+        row = summary_from_table(pd.Timestamp(p.stem), pd.read_csv(p))
+        row.pop("_table").to_csv(f / "tables" / f"{p.stem}.csv", index=False)
+        rows.append(row)
+    pd.DataFrame(rows).to_csv(f / "theta_resumen.csv", index=False)
+    return len(rows)
+
+
 def load_theta_folder(folder) -> tuple[pd.DataFrame, list[str]]:
     """Lee la carpeta de salida de download_range y devuelve lo mismo que summarize_folder."""
     f = Path(folder)
@@ -70,5 +84,8 @@ def load_theta_folder(folder) -> tuple[pd.DataFrame, list[str]]:
 
 
 if __name__ == "__main__":
+    if sys.argv[1] == "--recalcular":                                  # python -m bot.theta_download --recalcular <carpeta>
+        print({"dias_recalculados": recompute_from_raw(sys.argv[2])})
+        sys.exit(0)
     out_dir, start, end = sys.argv[1], sys.argv[2], sys.argv[3]
     print(download_range(out_dir, start, end, sys.argv[4] if len(sys.argv) > 4 else "SPXW"))

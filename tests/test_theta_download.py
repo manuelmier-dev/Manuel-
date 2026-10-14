@@ -9,7 +9,7 @@ import pandas as pd
 
 from bot.loaders import summarize_folder
 from bot.theta_client import ThetaError, build_url, get_frame, normalize_oi, normalize_quotes, open_interest
-from bot.theta_download import download_range, expiration_days, load_theta_folder
+from bot.theta_download import download_range, expiration_days, load_theta_folder, recompute_from_raw
 from test_loaders2 import STRIKES, prices
 
 DAYS = ["2026-10-12", "2026-10-13", "2026-10-14"]
@@ -103,6 +103,17 @@ class TestDownload(unittest.TestCase):
         self.assertEqual(df.iloc[0]["gamma_fuente"], "estimada")
         self.assertTrue(np.isnan(df.iloc[0]["em_tradestation"]))
 
+    def test_raw_tables_are_saved_and_recompute_matches(self):
+        d = tempfile.mkdtemp()
+        self.run_download(d)
+        self.assertTrue((Path(d) / "raw" / "2026-10-13.csv").exists())
+        before, _ = load_theta_folder(d)
+        self.assertEqual(recompute_from_raw(d), 3)                              # sin llamar a la API
+        after, _ = load_theta_folder(d)
+        self.assertEqual(len(after), 3)
+        self.assertAlmostEqual(before.iloc[0]["spot"], after.iloc[0]["spot"])
+        self.assertAlmostEqual(before.iloc[0]["gex_bn"], after.iloc[0]["gex_bn"])
+
     def test_summarize_folder_dispatches_to_theta_folder(self):
         d = tempfile.mkdtemp()
         self.run_download(d)
@@ -139,3 +150,18 @@ class TestDownload(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSpotParityWideChain(unittest.TestCase):
+    def test_far_strikes_with_empty_quotes_do_not_fake_the_spot(self):
+        from bot.loaders import _spot_by_parity
+        k = np.arange(3000.0, 10001.0, 5.0)
+        spot = 7700.0
+        mid_c, mid_p = np.maximum(spot - k, 0) + 0.05, np.maximum(k - spot, 0) + 0.05      # valor intrínseco + 5 centavos
+        near = np.abs(k - spot) < 40
+        mid_c[near] += 8 - np.abs(k[near] - spot) / 10
+        mid_p[near] += 8 - np.abs(k[near] - spot) / 10
+        z = pd.DataFrame({"strike": k, "mid_c": mid_c, "mid_p": mid_p})
+        far = (k > 9000) | (k < 4000)                                                       # call y put "iguales" (0.05) lejos del dinero
+        z.loc[far, ["mid_c", "mid_p"]] = 0.05
+        self.assertAlmostEqual(_spot_by_parity(z), spot, delta=6)

@@ -35,7 +35,7 @@ class TestThetaSnapshot(unittest.TestCase):
         q, oi = theta_frames()
         theta = summary_from_theta(pd.Timestamp(2026, 10, 13), q, oi)
         ts = parse_chain_frame(fake_sheet(), pd.Timestamp(2026, 10, 13))
-        self.assertEqual(set(ts) - {"fuente"}, set(theta) - {"fuente"})
+        self.assertEqual(set(ts) - {"fuente"}, set(theta) - {"fuente", "_raw"})
 
     def test_crossed_and_empty_quotes_are_dropped(self):
         q, oi = theta_frames()

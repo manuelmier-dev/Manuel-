@@ -60,8 +60,14 @@ def _em_tradestation(raw: pd.DataFrame) -> float:
     return float(m[1]) if m else float("nan")
 
 
-def _spot_by_parity(z: pd.DataFrame) -> float:
+def _spot_by_parity(z: pd.DataFrame, min_mid: float = 1.0) -> float:
+    """Spot por paridad con los 5 strikes donde call y put valen casi lo mismo.
+    Solo cuentan strikes donde AMBOS lados valen >= min_mid: en cadenas anchas (Theta trae cientos de strikes) los strikes lejanos
+    tienen call y put casi en cero, y su diferencia ~0 haría pasar un strike lejano por "el dinero"."""
     ok = z.dropna(subset=["mid_c", "mid_p"])
+    liquid = ok[(ok["mid_c"] >= min_mid) & (ok["mid_p"] >= min_mid)]
+    if len(liquid) >= 3:
+        ok = liquid
     near = ok.iloc[(ok["mid_c"] - ok["mid_p"]).abs().argsort()[:5]]
     return float((near["strike"] + near["mid_c"] - near["mid_p"]).median())
 
