@@ -114,3 +114,10 @@ una sola sesión por cuenta e IP fija (errores 476/478); plan Standard con 2 hil
 - `python -m bot.theta_download <salida> <desde> <hasta>`: un día por vez, reanuda, registra errores en `theta_errores.csv`, se detiene si hay conflicto de sesión.
 - `bot.run_backtest`, `bot.sweep` y `bot.make_journal` aceptan esa carpeta en lugar de la de archivos de TradeStation.
 - Correr fuera del horario de mercado, y con un solo Theta Terminal activo.
+
+## Gráficas de estudio y estrategia de tendencia (14-oct-2026)
+- `python -m bot.make_study "<cadenas>" "<barras ES>" "<salida>"`: `estudio_dias.pdf` (una página por día), `png/` y `estudio_zonas.csv`.
+  Cada gráfica marca con "x" el máximo y mínimo reales del día, los toques a la zona de los walls (con sus confirmaciones), las entradas, las salidas,
+  la primera hora, ±1 EM, VWAP y Bollinger. El CSV mide si el máximo/mínimo del día cae cerca del wall (en EM) y si ocurrió en la primera hora.
+- `python -m bot.run_trend ...`: prueba de **ruptura del rango de la primera hora** (ORB) en días de gamma negativo. Hipótesis, sin evidencia.
+- `Params.second_entry`: "mismo_lado" (regla), "ninguna" o "reversa" (tras un stop, entrar en sentido contrario; diagnóstico para días de ruptura).

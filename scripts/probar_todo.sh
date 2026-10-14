@@ -27,6 +27,10 @@ if [ -f "$BASE/ES_5min.csv" ] && [ -d "$BASE/cadenas" ]; then
   python -m bot.run_backtest "$BASE/cadenas" "$BASE/ES_5min.csv" "$BASE/operaciones.csv" 2>&1 | tail -60
   echo "== Mapa de sensibilidad (diagnóstico)"
   python -m bot.sweep "$BASE/cadenas" "$BASE/ES_5min.csv" "$BASE/sensibilidad.csv" 2>&1 | tail -45
+  echo "== Gráficas de estudio (una página por día)"
+  mkdir -p "$BASE/estudio" && python -m bot.make_study "$BASE/cadenas" "$BASE/ES_5min.csv" "$BASE/estudio" 2>&1 | tail -12
+  echo "== Prueba de ruptura del rango de la primera hora en días de gamma negativo (diagnóstico)"
+  python -m bot.run_trend "$BASE/cadenas" "$BASE/ES_5min.csv" "$BASE/ruptura_tendencia.csv" 2>&1 | tail -22
   echo "== 5/5 Bitácora"
   python -m bot.make_journal "$BASE/cadenas" "$BASE/ES_5min.csv" "$BASE/bitacora.csv" 2>&1 | tail -25
 else
@@ -36,7 +40,8 @@ else
   [ -d "$BASE/cadenas" ] && python -m bot.inspect_chains "$BASE/cadenas" "$BASE/resumen_cadenas.csv" 2>&1 | tail -15
 fi
 mkdir -p "$BASE/resultados"
-for f in operaciones bitacora resumen_cadenas comparacion_walls sensibilidad; do [ -f "$BASE/$f.csv" ] && cp -f "$BASE/$f.csv" "$BASE/resultados/"; done
+for f in operaciones bitacora resumen_cadenas comparacion_walls sensibilidad ruptura_tendencia; do [ -f "$BASE/$f.csv" ] && cp -f "$BASE/$f.csv" "$BASE/resultados/"; done
 [ -f "$BASE/reporte_backtest.json" ] && cp -f "$BASE/reporte_backtest.json" "$BASE/resultados/"
+[ -d "$BASE/estudio" ] && cp -rf "$BASE/estudio" "$BASE/resultados/"
 echo "== Resultados guardados en $BASE/resultados (se bajan solos a Dropbox con subir_y_probar.ps1)"
 echo "== Fin. Mándame la captura de esta pantalla."

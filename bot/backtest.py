@@ -47,6 +47,30 @@ def _manage(bars, start, side, entry, stop, target, p):
     return len(bars) - 1, last["close"] - d * p.slippage_pts, "cierre_dia"
 
 
+def evaluate_signal(row, call_w, put_w, tol, p: Params):
+    """Qué ve el bot en una barra: lado (corto en el call wall, largo en el put wall), cuántas confirmaciones y si cerró del lado de adentro."""
+    near_call = bool(pd.notna(call_w) and row["high"] >= call_w - tol)
+    near_put = bool(pd.notna(put_w) and row["low"] <= put_w + tol)
+    side = "short" if (near_call and not near_put) else "long" if (near_put and not near_call) else None
+    if side is None:
+        return None
+    rejected_ok = not ((side == "short" and row["close"] >= call_w) or (side == "long" and row["close"] <= put_w))
+    return {"side": side, "conf": confirmations(row, side, p), "rejection_ok": rejected_ok}
+
+
+def _levels(next_open, side, call_w, put_w, em, p: Params):
+    d = 1 if side == "long" else -1
+    entry = next_open + d * p.slippage_pts
+    stop = entry - d * p.stop_frac * em
+    opp = put_w if side == "short" else call_w
+    raw_target = entry + d * p.target_frac * em
+    if pd.isna(opp):
+        target = raw_target
+    else:
+        target = max(raw_target, opp) if side == "short" else min(raw_target, opp)
+    return entry, stop, target, d
+
+
 def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params()):
     errs = validate_bars(bars) + validate_days(days)
     if errs:
@@ -83,30 +107,13 @@ def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params()):
             limit = p.entry_end if entries == 0 else p.reentry_end
             if t > limit:
                 break
-            near_call = bool(pd.notna(call_w) and row["high"] >= call_w - tol)
-            near_put = bool(pd.notna(put_w) and row["low"] <= put_w + tol)
-            side = None
-            if near_call and not near_put:
-                side = "short"
-            elif near_put and not near_call:
-                side = "long"
-            if side is None or confirmations(row, side, p) < p.confirmations_required:
-                i += 1
+            sig = evaluate_signal(row, call_w, put_w, tol, p)
+            if sig is None or sig["conf"] < p.confirmations_required or (p.require_rejection and not sig["rejection_ok"]):
+                i += 1                      # sin señal, o la barra cerró del lado de afuera del wall (se rompió, no rebotó)
                 continue
-            if p.require_rejection and ((side == "short" and row["close"] >= call_w) or (side == "long" and row["close"] <= put_w)):
-                i += 1                      # la barra cerró del lado de afuera del wall: se rompió, no rebotó
-                continue
-
+            side = sig["side"]
             nxt = b.iloc[i + 1]
-            d = 1 if side == "long" else -1
-            entry = nxt["open"] + d * p.slippage_pts
-            stop = entry - d * p.stop_frac * em
-            opp = put_w if side == "short" else call_w
-            raw_target = entry + d * p.target_frac * em
-            if pd.isna(opp):
-                target = raw_target
-            else:
-                target = max(raw_target, opp) if side == "short" else min(raw_target, opp)
+            entry, stop, target, d = _levels(nxt["open"], side, call_w, put_w, em, p)
             if d * (target - entry) <= 0:
                 i += 1
                 continue
@@ -118,10 +125,25 @@ def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params()):
                 "date": date, "n": entries, "side": side,
                 "entry_time": nxt.name, "entry": entry, "stop": stop, "target": target,
                 "exit_time": b.index[j], "exit": exit_px, "reason": reason,
-                "pts": pts, "usd": pts * p.point_value - p.commission_rt,
+                "pts": pts, "usd": pts * p.point_value - p.commission_rt, "tipo": "normal",
             })
-            if reason != "stop":
+            if reason != "stop" or p.second_entry == "ninguna":
                 break          # solo se reintenta después de un stop
+            if p.second_entry == "reversa":
+                # diagnóstico para días de ruptura: entrada inmediata en sentido contrario, sin confirmaciones
+                if j + 1 < len(b) and entries < p.max_entries:
+                    side2 = "short" if side == "long" else "long"
+                    n2 = b.iloc[j + 1]
+                    e2, s2, t2, d2 = _levels(n2["open"], side2, call_w, put_w, em, p)
+                    if d2 * (t2 - e2) > 0:
+                        k2, x2, r2 = _manage(b, j + 1, side2, e2, s2, t2, p)
+                        entries += 1
+                        trades.append({
+                            "date": date, "n": entries, "side": side2, "entry_time": n2.name, "entry": e2, "stop": s2, "target": t2,
+                            "exit_time": b.index[k2], "exit": x2, "reason": r2, "pts": d2 * (x2 - e2),
+                            "usd": d2 * (x2 - e2) * p.point_value - p.commission_rt, "tipo": "reversa",
+                        })
+                break
             i = j + 1
 
     return pd.DataFrame(trades), pd.DataFrame(skipped, columns=["date", "reason"])

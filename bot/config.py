@@ -15,7 +15,7 @@ class Params:
     target_frac: float = 0.90
 
     # Horarios (hora de Nueva York)
-    entry_start: time = time(9, 35)    # PROVISIONAL (14-oct): no se evalúa la señal de la barra de las 9:30; las entradas de la primera barra perdieron 0 de 4
+    entry_start: time = time(9, 30)    # la primera hora completa. (Probar 9:35 = no evaluar la barra de apertura; ver REGLAS.md)
     entry_end: time = time(10, 30)     # límite para la 1a entrada
     reentry_end: time = time(11, 30)   # límite para la 2a entrada (SUPUESTO, ajustable)
     flat_time: time = time(15, 55)     # cierre forzado (SUPUESTO, ajustable)
@@ -25,6 +25,8 @@ class Params:
     zone_tol_frac: float = 0.10
 
     require_rejection: bool = False    # exige que la barra de la señal cierre del lado de adentro del wall (corto: cierra debajo; largo: arriba). En prueba
+
+    second_entry: str = "mismo_lado"   # tras un stop: "mismo_lado" (regla de Manuel), "ninguna" o "reversa" (diagnóstico para días de ruptura)
 
     # Confirmaciones (VWAP, Bollinger, RSI)
     confirmations_required: int = 2

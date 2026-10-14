@@ -85,5 +85,21 @@ class TestRejection(unittest.TestCase):
         self.assertEqual(strict.iloc[0]["side"], "short")
 
 
+class TestSecondEntryModes(unittest.TestCase):
+    def test_modes_after_a_stop(self):
+        from dataclasses import replace
+        b, d = scenario([5050, 5060, 5070, 5080])
+        same, _ = run_backtest(b, d, P)
+        none, _ = run_backtest(b, d, replace(P, second_entry="ninguna"))
+        rev, _ = run_backtest(b, d, replace(P, second_entry="reversa"))
+        self.assertEqual(len(none), 1)
+        self.assertEqual(none.iloc[0]["reason"], "stop")
+        self.assertEqual(rev.iloc[0]["tipo"], "normal")
+        if len(rev) == 2:
+            self.assertEqual(rev.iloc[1]["tipo"], "reversa")
+            self.assertEqual(rev.iloc[1]["side"], "long")           # contrario al corto que se rompió
+        self.assertIn("tipo", same.columns)
+
+
 if __name__ == "__main__":
     unittest.main()
