@@ -32,8 +32,11 @@ def ts_csv(days=("2026-10-12", "2026-10-13"), shift_hours=0):
 
 
 def premarket(date_str):
+    """Barras de 9:00 a 9:25 y el cierre (15:55) del día anterior, todas a 5000."""
     idx = pd.date_range(f"{date_str} 09:00", f"{date_str} 09:25", freq="5min", tz=NY)
-    return pd.DataFrame({"open": 5000.0, "high": 5000.0, "low": 5000.0, "close": 5000.0, "volume": 100.0}, index=idx)
+    prev = pd.DatetimeIndex([pd.Timestamp(f"{date_str} 15:55", tz=NY) - pd.Timedelta(days=1)])
+    return pd.DataFrame({"open": 5000.0, "high": 5000.0, "low": 5000.0, "close": 5000.0, "volume": 100.0},
+                        index=prev.append(idx))
 
 
 def summary(spot=5000.0):
@@ -89,6 +92,17 @@ class TestPipeline(unittest.TestCase):
         table = compare_wall_modes(summary(), pd.concat([premarket("2024-01-03"), rth]), P)
         self.assertEqual(list(table["wall"]), ["oi", "oi_1em", "gex"])
         self.assertTrue((table["operaciones"] == 1).all())
+
+    def test_sweep_runs_a_small_grid(self):
+        from datetime import time
+
+        from bot.pipeline import sweep
+        rth, _ = scenario([5030, 5015, 5004, 5000])
+        table = sweep(summary(), pd.concat([premarket("2024-01-03"), rth]), P,
+                      grid={"wall": ["oi"], "stop_frac": [0.2, 0.3], "entry_start": [time(9, 30), time(9, 35)]})
+        self.assertEqual(len(table), 4)
+        self.assertEqual(set(table["stop_frac"]), {0.2, 0.3})
+        self.assertIn("resultado_total_usd", table.columns)
 
     def test_absurd_basis_skips_day(self):
         rth, _ = scenario([5030, 5015, 5004, 5000])

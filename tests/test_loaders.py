@@ -55,7 +55,10 @@ class TestDays(unittest.TestCase):
     def _bars(self):
         idx = pd.date_range("2024-01-03 08:00", "2024-01-03 10:00", freq="5min", tz="America/New_York")
         close = pd.Series(np.linspace(7800, 7830, len(idx)), index=idx)
-        return pd.DataFrame({"open": close, "high": close, "low": close, "close": close, "volume": 100.0})
+        day = pd.DataFrame({"open": close, "high": close, "low": close, "close": close, "volume": 100.0})
+        prev = pd.DataFrame({"open": 7800.0, "high": 7800.0, "low": 7800.0, "close": 7800.0, "volume": 100.0},
+                            index=[pd.Timestamp("2024-01-02 15:55", tz="America/New_York")])    # cierre del día anterior
+        return pd.concat([prev, day])
 
     def test_build_days_uses_tradestation_em_and_oi_walls(self):
         summ = pd.DataFrame([parse_chain_frame(fake_sheet(), pd.Timestamp(2024, 1, 3).replace(year=2026, month=10, day=13))])
@@ -65,9 +68,8 @@ class TestDays(unittest.TestCase):
         row = days.iloc[0]
         self.assertEqual(row["em_pts"], 22.83)
         self.assertEqual(row["call_wall"], summ.iloc[0]["call_wall_oi"])
-        # la barra de las 9:15 cierra a las 9:20; base = su cierre - SPX del archivo
-        bar = self._bars().loc["2024-01-03 09:15", "close"]
-        self.assertAlmostEqual(row["basis"], bar - summ.iloc[0]["spot"])
+        # la base sale del CIERRE de ES del día anterior (7800) menos el spot del archivo, no del precio de las 9:15
+        self.assertAlmostEqual(row["basis"], 7800.0 - summ.iloc[0]["spot"])
 
     def test_em_falls_back_to_straddle(self):
         summ = pd.DataFrame([parse_chain_frame(fake_sheet(em_header="x"), pd.Timestamp(2026, 10, 13))])
@@ -78,7 +80,7 @@ class TestDays(unittest.TestCase):
     def test_skips_day_without_premarket_bar(self):
         summ = pd.DataFrame([parse_chain_frame(fake_sheet(), pd.Timestamp(2026, 10, 13))])
         summ["date"] = pd.Timestamp(2024, 1, 3)
-        rth_only = self._bars().between_time("09:30", "10:00")
+        rth_only = self._bars().between_time("09:30", "10:00")      # sin pre-mercado ni cierre previo
         days, skipped = build_days(summ, rth_only)
         self.assertTrue(days.empty)
         self.assertEqual(len(skipped), 1)

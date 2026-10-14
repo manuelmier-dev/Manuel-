@@ -150,6 +150,7 @@ def parse_chain_frame(raw: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et=N
     call_1em = _max_oi_strike(z[(z["strike"] >= spot) & (z["strike"] <= spot + em_ref)], "oi_c")
     put_1em = _max_oi_strike(z[(z["strike"] <= spot) & (z["strike"] >= spot - em_ref)], "oi_p")
     return {
+        "_table": z[["strike", "oi_c", "oi_p"]].copy(),     # Open Interest por strike (para recalcular walls alrededor del precio real)
         "date": trade_date.date(),
         "snapshot_et": snapshot_et.strftime("%H:%M") if snapshot_et is not None else "",
         "gamma_fuente": "archivo" if layout == "completo" else "estimada",

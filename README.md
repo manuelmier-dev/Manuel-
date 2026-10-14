@@ -82,3 +82,13 @@ Con pocos días no concluye nada; sirve para encontrar errores y ver el comporta
 - Si un lado no tiene wall (OI cero en el rango), ese lado no genera entradas y el objetivo es solo el 90% del EM.
 - Desde el 15-oct Manuel exportará todos los strikes. Para comparar con los archivos viejos, el GEX (`gex_bn`, `gex_ratio`) se calcula con los
   strikes a ±90 pts del precio (todos los archivos viejos caben en esa ventana, así que sus valores no cambian); `gex_bn_total` usa todos los strikes del archivo.
+
+## Corrección importante: el spot de las 9:20 es el cierre del día anterior (14-oct-2026)
+La cadena de las 9:20 trae precios de antes de abrir: el "spot" por paridad coincide con el cierre previo (correlación 0.94 con el
+cierre de ES del día anterior, contra 0.85 con la apertura). Por eso la primera versión del backtest alineaba mal los walls con ES
+(error de ±34 pts, la desviación del salto nocturno, más de 1 EM).
+- `bot/days.py`: base ES-SPX (`carry`) = cierre de ES del día anterior - spot del archivo, con mediana móvil de 5 días.
+  Precio real a las 9:20 en coordenadas SPX = ES(9:15) - carry. Los walls "±1 EM" se buscan alrededor de ese precio.
+- `python -m bot.sweep`: mapa de sensibilidad (stop, objetivo, confirmaciones, hora de inicio, wall). Diagnóstico, no para elegir el "mejor".
+- Diagnóstico de la primera corrida (con la alineación vieja): 11 de 19 stops cayeron en la misma barra de la entrada;
+  las 6 entradas de las 9:35 perdieron todas. Hipótesis por probar, no regla.

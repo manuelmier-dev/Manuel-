@@ -11,6 +11,7 @@ if __name__ == "__main__":
     df, errors = summarize_folder(folder)
     pd.set_option("display.width", 200, "display.max_columns", 30)
     if not df.empty:
+        df = df.drop(columns=["_table"], errors="ignore")
         df.to_csv(out, index=False)
         print(df.drop(columns=["file", "strike_min", "strike_max", "call_wall_gex", "put_wall_gex", "snapshot_et", "gamma_fuente"]).round(2).to_string(index=False))
         print(f"\nArchivos leídos: {len(df)}  |  guardado en {out}")

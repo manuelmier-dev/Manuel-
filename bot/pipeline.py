@@ -35,3 +35,33 @@ def compare_wall_modes(summary: pd.DataFrame, bars: pd.DataFrame, p: Params = Pa
             "dias_sin_operar", "operaciones", "aciertos_%", "ganancia_media_usd", "perdida_media_usd",
             "resultado_total_usd", "peor_caida_usd", "segundas_entradas")}})
     return pd.DataFrame(rows)
+
+
+def sweep(summary: pd.DataFrame, bars: pd.DataFrame, base: Params = Params(), grid: dict | None = None) -> pd.DataFrame:
+    """Mapa de sensibilidad: cómo cambia el resultado al variar parámetros. Es un DIAGNÓSTICO, no una búsqueda del mejor valor:
+    con pocos días, el "mejor" de muchas combinaciones casi siempre es suerte."""
+    from dataclasses import replace
+    from datetime import time
+    from itertools import product
+
+    grid = grid or {
+        "wall": list(WALL_MODES), "stop_frac": [0.2, 0.3, 0.4], "target_frac": [0.5, 0.9],
+        "confirmations_required": [1, 2, 3], "entry_start": [time(9, 30), time(9, 35)],
+    }
+    keys = list(grid)
+    days_cache: dict = {}
+    rows = []
+    for combo in product(*(grid[k] for k in keys)):
+        cfg = dict(zip(keys, combo))
+        mode = cfg.pop("wall", "oi_1em")
+        if mode not in days_cache:
+            days_cache[mode] = build_days(summary, bars, wall_mode=mode)[0]
+        days = days_cache[mode]
+        p = replace(base, **cfg)
+        trades, skipped = run_backtest(bars, days, p) if not days.empty else (pd.DataFrame(), pd.DataFrame())
+        rep = summarize(trades, skipped, len(days))
+        rows.append({"wall": mode, **{k: (v.strftime("%H:%M") if hasattr(v, "strftime") else v) for k, v in cfg.items()},
+                     "operaciones": rep.get("operaciones", 0), "aciertos_%": rep.get("aciertos_%"),
+                     "resultado_total_usd": rep.get("resultado_total_usd"), "peor_caida_usd": rep.get("peor_caida_usd"),
+                     "factor_ganancia": rep.get("factor_ganancia")})
+    return pd.DataFrame(rows)
