@@ -20,6 +20,7 @@ pip install -q -r requirements.txt || { echo "Falló pip install"; exit 1; }
 
 echo "== 3/5 Pruebas (deben decir OK)"
 python -m unittest discover -s tests 2>&1 | tail -4
+N=$(ls "$BASE/bot-fase1/tests" | wc -l); echo "   (si dice menos de 34 pruebas, el ZIP de Dropbox es viejo)"
 
 if [ -f "$BASE/ES_5min.csv" ] && [ -d "$BASE/cadenas" ]; then
   echo "== 4/5 Backtest"
@@ -27,8 +28,9 @@ if [ -f "$BASE/ES_5min.csv" ] && [ -d "$BASE/cadenas" ]; then
   echo "== 5/5 Bitácora"
   python -m bot.make_journal "$BASE/cadenas" "$BASE/ES_5min.csv" "$BASE/bitacora.csv" 2>&1 | tail -25
 else
-  echo "== 4/5 y 5/5 omitidos: falta $BASE/ES_5min.csv o la carpeta $BASE/cadenas"
-  echo "   Resumen de cadenas sin barras de ES:"
+  [ -f "$BASE/ES_5min.csv" ] || echo "== AVISO: falta $BASE/ES_5min.csv (las barras de ES). Sin ellas no hay backtest."
+  [ -d "$BASE/cadenas" ] || echo "== AVISO: falta la carpeta $BASE/cadenas"
+  echo "== 4/5 y 5/5 omitidos. Resumen de cadenas sin barras de ES:"
   [ -d "$BASE/cadenas" ] && python -m bot.inspect_chains "$BASE/cadenas" "$BASE/resumen_cadenas.csv" 2>&1 | tail -15
 fi
 mkdir -p "$BASE/resultados"

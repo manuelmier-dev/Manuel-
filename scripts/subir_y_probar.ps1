@@ -1,4 +1,4 @@
-# subir_y_probar.ps1 -- funciona en cualquier computadora con Dropbox (busca solo la carpeta de Dropbox).
+﻿# subir_y_probar.ps1 -- funciona en cualquier computadora con Dropbox (busca solo la carpeta de Dropbox).
 # *** NO PROBADO en Windows: Claude no tiene Windows. Si da error, manda la captura y se corrige.
 #
 # Uso (PowerShell, ventana azul):   .\subir_y_probar.ps1        o        .\subir_y_probar.ps1 -Servidor 1.2.3.4
