@@ -44,5 +44,14 @@ class TestWalls(unittest.TestCase):
         self.assertAlmostEqual(trades.iloc[0]["entry"] - trades.iloc[0]["target"], 36.0)   # 90% de 40, sin wall contrario
 
 
+class TestIncompleteDay(unittest.TestCase):
+    def test_partial_session_is_skipped_not_traded(self):
+        b, d = scenario([5030, 5015, 5004, 5000])
+        partial = b.between_time("09:30", "11:30")        # el mercado sigue abierto: faltan barras
+        trades, skipped = run_backtest(partial, d, P)
+        self.assertTrue(trades.empty)
+        self.assertEqual(skipped.iloc[0]["reason"], "sesion_incompleta")
+
+
 if __name__ == "__main__":
     unittest.main()

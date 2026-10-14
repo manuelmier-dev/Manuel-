@@ -67,6 +67,9 @@ def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params()):
             continue
 
         b = by_day[date]
+        if len(b.between_time("09:30", "15:55")) < p.min_session_bars:
+            skipped.append((date, "sesion_incompleta"))     # p. ej. el día de hoy, mientras sigue abierto el mercado
+            continue
         b = b[b.index.time >= p.entry_start]
         em = float(day["em_pts"])
         tol = p.zone_tol_frac * em

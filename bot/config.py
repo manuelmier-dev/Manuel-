@@ -33,6 +33,9 @@ class Params:
     rsi_high: float = 70.0
     rsi_low: float = 30.0
 
+    # Datos
+    min_session_bars: int = 70         # un día con menos barras de 5 min entre 9:30 y 15:55 (de 78) se considera incompleto y no se opera
+
     # Costos (ES)
     point_value: float = 50.0
     slippage_pts: float = 0.25         # por lado, en contra
