@@ -109,6 +109,8 @@ def _table_no_gamma(raw: pd.DataFrame, trade_date: pd.Timestamp) -> pd.DataFrame
         "bid_c": _num(body[NG["c_bid"]]), "ask_c": _num(body[NG["c_ask"]]),
         "bid_p": _num(body[NG["p_bid"]]), "ask_p": _num(body[NG["p_ask"]]),
     }).dropna(subset=["strike"]).sort_values("strike").reset_index(drop=True)
+    if z["strike"].duplicated().any():
+        raise ValueError("el archivo trae más de un vencimiento y, sin símbolos, no se pueden separar")
     # filas basura al final del archivo (precios absurdos): la delta del call nunca puede subir al alejarse
     keep, prev = [], 1.01
     for d in z["d_c"]:

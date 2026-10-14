@@ -60,6 +60,13 @@ class TestNoGammaLayout(unittest.TestCase):
         self.assertEqual(out["em_tradestation"], 19.69)
         self.assertLess(out["gex_bn"], 0)                          # más OI de puts que de calls
 
+    def test_file_with_two_expirations_is_rejected(self):
+        sheet = no_gamma_sheet(garbage=False)
+        doubled = pd.concat([sheet, sheet.iloc[3:]], ignore_index=True)      # mismos strikes dos veces = dos vencimientos
+        with self.assertRaises(ValueError) as cm:
+            parse_chain_frame(doubled, pd.Timestamp(2026, 8, 17))
+        self.assertIn("más de un vencimiento", str(cm.exception))
+
     def test_wrong_expiry_date_is_rejected(self):
         with self.assertRaises(ValueError):
             parse_chain_frame(no_gamma_sheet(), pd.Timestamp(2026, 8, 18))

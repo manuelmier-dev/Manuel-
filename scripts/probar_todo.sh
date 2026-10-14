@@ -34,6 +34,7 @@ else
   [ -d "$BASE/cadenas" ] && python -m bot.inspect_chains "$BASE/cadenas" "$BASE/resumen_cadenas.csv" 2>&1 | tail -15
 fi
 mkdir -p "$BASE/resultados"
-for f in operaciones bitacora resumen_cadenas; do [ -f "$BASE/$f.csv" ] && cp -f "$BASE/$f.csv" "$BASE/resultados/"; done
+for f in operaciones bitacora resumen_cadenas comparacion_walls; do [ -f "$BASE/$f.csv" ] && cp -f "$BASE/$f.csv" "$BASE/resultados/"; done
+[ -f "$BASE/reporte_backtest.json" ] && cp -f "$BASE/reporte_backtest.json" "$BASE/resultados/"
 echo "== Resultados guardados en $BASE/resultados (se bajan solos a Dropbox con subir_y_probar.ps1)"
 echo "== Fin. Mándame la captura de esta pantalla."

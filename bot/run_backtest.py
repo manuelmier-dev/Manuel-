@@ -4,6 +4,7 @@ Con pocos días el resultado NO concluye nada: sirve para encontrar errores y ve
 """
 import json
 import sys
+from pathlib import Path
 
 from .journal import load_es_bars_csv
 from .loaders import summarize_folder
@@ -15,10 +16,15 @@ if __name__ == "__main__":
     summary, errors = summarize_folder(folder)
     bars = load_es_bars_csv(bars_path)
     trades, skipped, days, skipped_days = backtest_from_summary(summary, bars)
-    print("== Comparación de definiciones de wall (la primera, oi_1em, es la que se usa abajo) ==")
-    print(compare_wall_modes(summary, bars).to_string(index=False))
-    print("\n== Detalle con wall = mayor Open Interest dentro de ±1 EM ==")
-    print(json.dumps(report(trades, skipped, days), indent=2, ensure_ascii=False, default=str))
+    folder_out = Path(out).parent
+    comp = compare_wall_modes(summary, bars)
+    rep = json.dumps(report(trades, skipped, days), indent=2, ensure_ascii=False, default=str)
+    comp.to_csv(folder_out / "comparacion_walls.csv", index=False)
+    (folder_out / "reporte_backtest.json").write_text(rep, encoding="utf-8")
+    print("== Comparación de definiciones de wall (se guarda también en comparacion_walls.csv) ==")
+    print(comp.to_string(index=False))
+    print("\n== Detalle con wall = mayor Open Interest dentro de ±1 EM (también en reporte_backtest.json) ==")
+    print(rep)
     if not trades.empty:
         trades.to_csv(out, index=False)
         print(f"Operaciones guardadas en {out}")
