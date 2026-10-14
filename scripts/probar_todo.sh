@@ -31,4 +31,7 @@ else
   echo "   Resumen de cadenas sin barras de ES:"
   [ -d "$BASE/cadenas" ] && python -m bot.inspect_chains "$BASE/cadenas" "$BASE/resumen_cadenas.csv" 2>&1 | tail -15
 fi
+mkdir -p "$BASE/resultados"
+for f in operaciones bitacora resumen_cadenas; do [ -f "$BASE/$f.csv" ] && cp -f "$BASE/$f.csv" "$BASE/resultados/"; done
+echo "== Resultados guardados en $BASE/resultados (se bajan solos a Dropbox con subir_y_probar.ps1)"
 echo "== Fin. Mándame la captura de esta pantalla."
