@@ -64,3 +64,12 @@ Límites vistos en el archivo real: solo ~30 strikes (±70 pts), gamma redondead
 ## Backtest completo
 `python -m bot.run_backtest "<carpeta de cadenas>" "<barras de ES .csv>" [operaciones.csv]`
 Con pocos días no concluye nada; sirve para encontrar errores y ver el comportamiento por primera y segunda entrada.
+
+## Formatos de cadena y regla de la hora (14-oct-2026)
+- Formato completo (sept. en adelante, `.xls` o `.csv`): trae gamma. Formato de agosto: sin símbolo ni gamma; la gamma se
+  estima de los precios (`bot.gex.gamma_from_quotes`). Validación contra archivos que sí traen gamma: mediana del cociente
+  1.00 (0.89 a 1.14 cerca del precio); el GEX total difiere entre 7% y 16%, el signo coincide.
+- La hora del nombre del archivo (`7.20am`) se toma como hora de **Mérida** y se pasa a Nueva York (`NAME_TZ` en `bot/loaders.py`).
+  Un archivo exportado después de las 9:30 NY se rechaza (los precios ya no son de antes de la apertura).
+- Si hay dos archivos del mismo día, queda el más tardío que sea válido (anterior a la apertura).
+- Se descartan las filas basura al final de los archivos de agosto (la delta del call no puede subir al alejarse del precio).

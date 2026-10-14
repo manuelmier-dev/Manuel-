@@ -14,11 +14,12 @@ def build_days(summary: pd.DataFrame, es_bars: pd.DataFrame, snapshot: time = ti
     rows, skipped = [], []
     for _, r in summary.iterrows():
         d = pd.Timestamp(r["date"])
-        ts = pd.Timestamp.combine(d.date(), snapshot).tz_localize(NY)
+        snap = pd.Timestamp(r["snapshot_et"]).time() if "snapshot_et" in r and r["snapshot_et"] else snapshot
+        ts = pd.Timestamp.combine(d.date(), snap).tz_localize(NY)
         # solo barras ya cerradas a la hora del archivo (inicio + duración <= 9:20)
         done = es_bars.loc[: ts - pd.Timedelta(minutes=bar_minutes)]
         if done.empty or ts - done.index[-1] > pd.Timedelta(minutes=max_gap_min):
-            skipped.append(f"{d.date()}: no hay barra de ES cerca de las {snapshot:%H:%M}")
+            skipped.append(f"{d.date()}: no hay barra de ES cerca de las {snap:%H:%M}")
             continue
         basis = float(done["close"].iloc[-1]) - float(r["spot"])
         if not -30 <= basis <= 150:
