@@ -5,7 +5,7 @@ Marcas (todas con "x"):
   x gris pequeña    una barra que toca la zona de un wall (c=n: cuántas de las 3 confirmaciones tenía)
   x verde / roja    entrada larga / corta del bot (su apertura de la barra siguiente a la señal)
   x negra / dorada  salida: stop / objetivo (o cierre del día)
-Líneas: wall de calls (rojo) y de puts (verde) con su zona, ±1 EM desde las 9:15 (gris punteado), VWAP (morado), Bollinger (gris).
+Líneas: walls INICIALES (9:20) call rojo / put verde con su zona, EXPECTED MOVEMENT (banda azul ±1 EM desde las 9:15), VWAP y sus bandas ±2σ (morado), Bollinger (gris); abajo RSI con 30/70; cartel de tipo de día (reversión/tendencia).
 """
 from datetime import time
 from pathlib import Path
@@ -50,7 +50,7 @@ def plot_day(date, b: pd.DataFrame, day: pd.Series, trades: pd.DataFrame, p: Par
     call_w, put_w = day["call_wall"] + day["basis"], day["put_wall"] + day["basis"]
     center_es = day["center_spx"] + day["basis"]
 
-    fig, ax = plt.subplots(figsize=(15, 8))
+    fig, (ax, axr) = plt.subplots(2, 1, figsize=(15, 10), sharex=True, gridspec_kw={"height_ratios": [4, 1]})
     first_hour = [i for ts, i in pos.items() if time(9, 30) <= ts.time() < FIRST_HOUR_END]
     if first_hour:
         ax.axvspan(first_hour[0] - .5, first_hour[-1] + .5, color=GOLD, alpha=.12, label="primera hora (9:30-10:30)")
@@ -59,16 +59,23 @@ def plot_day(date, b: pd.DataFrame, day: pd.Series, trades: pd.DataFrame, p: Par
     ax.bar(x, (b["close"] - b["open"]).abs().clip(lower=.25), bottom=b[["open", "close"]].min(axis=1), width=.6,
            color=np.where(up, GREEN, RED), alpha=.85)
     ax.plot(x, b["vwap"], color=PURPLE, lw=1.4, label="VWAP")
+    ax.plot(x, b["vwap_up"], color=PURPLE, lw=1, ls="--", alpha=.8, label="VWAP banda alta (+2σ)")
+    ax.plot(x, b["vwap_dn"], color=PURPLE, lw=1, ls="--", alpha=.8, label="VWAP banda baja (-2σ)")
     ax.plot(x, b["bb_up"], color="gray", lw=.8, ls="-", alpha=.6, label="Bollinger 20/2")
     ax.plot(x, b["bb_dn"], color="gray", lw=.8, ls="-", alpha=.6)
-    for lvl, col, name in ((call_w, RED, "call wall"), (put_w, GREEN, "put wall")):
-        if pd.notna(lvl):
-            ax.hlines(lvl, -1, len(b) - 1, color=col, ls="--", lw=1.3)
-            ax.fill_between([-1, len(b) - 1], lvl - tol, lvl + tol, color=col, alpha=.10)
-            ax.text(len(b), lvl, f"{name} {lvl:.0f}", color=col, va="center", fontsize=9, weight="bold")
+    # EXPECTED MOVEMENT: banda sombreada centro ± EM (centro = precio de las 9:15 en coordenadas ES)
+    ax.axhspan(center_es - em, center_es + em, color=BLUE, alpha=.05)
     for lvl, name in ((center_es - em, "-1 EM"), (center_es + em, "+1 EM")):
-        ax.hlines(lvl, -1, len(b) - 1, color="gray", ls=":", lw=1)
-        ax.text(len(b), lvl, f"{name} {lvl:.0f}", color="gray", va="center", fontsize=8)
+        ax.hlines(lvl, -1, len(b) - 1, color=BLUE, ls=":", lw=1.2)
+        ax.text(len(b) - 2, lvl, f"{name} {lvl:.0f}", color=BLUE, va="bottom", ha="right", fontsize=8)
+    ax.text(0.5, center_es, f"EXPECTED MOVEMENT ±{em:.1f} pts (centro {center_es:.0f})", color=BLUE, fontsize=10,
+            weight="bold", va="bottom", transform=ax.get_yaxis_transform(), ha="center")
+    # WALLS INICIALES (calculados con la cadena de las 9:20; no se mueven en el día)
+    for lvl, col, name, spx in ((call_w, RED, "CALL WALL inicial", day["call_wall"]), (put_w, GREEN, "PUT WALL inicial", day["put_wall"])):
+        if pd.notna(lvl):
+            ax.hlines(lvl, -1, len(b) - 1, color=col, ls="-", lw=2.2)
+            ax.fill_between([-1, len(b) - 1], lvl - tol, lvl + tol, color=col, alpha=.15)
+            ax.text(len(b), lvl, f"{name}\n{lvl:.0f} ES (SPX {spx:.0f})", color=col, va="center", fontsize=9, weight="bold")
 
     # máximo y mínimo reales del día (sesión regular)
     rth = b.between_time("09:30", "15:55")
@@ -94,13 +101,28 @@ def plot_day(date, b: pd.DataFrame, day: pd.Series, trades: pd.DataFrame, p: Par
         ax.plot(xt, t["exit"], marker="x", ms=13, mew=3, color="black" if t["reason"] == "stop" else GOLD, ls="none")
         ax.annotate(f"{t['reason']} {t['usd']:+.0f} USD", (xt, t["exit"]), textcoords="offset points", xytext=(8, -14), fontsize=9)
 
-    ax.set_xlim(-1, len(b) + 9)                 # espacio a la derecha para las etiquetas de los niveles
+    ax.set_xlim(-1, len(b) + 12)                # espacio a la derecha para las etiquetas de los niveles
     ticks = [i for ts, i in pos.items() if ts.minute == 0]
-    ax.set_xticks(ticks)
-    ax.set_xticklabels([b.index[i].strftime("%H:%M") for i in ticks])
-    regime = "gamma POSITIVO (reversión)" if day["gex_bn"] > 0 else "gamma NEGATIVO (tendencia)"
+    axr.set_xticks(ticks)
+    axr.set_xticklabels([b.index[i].strftime("%H:%M") for i in ticks])
+    axr.plot(x, b["rsi"], color=BLUE, lw=1.2)
+    for lvl in (p.rsi_low, p.rsi_high):
+        axr.axhline(lvl, color="gray", ls="--", lw=1)
+    axr.axhline(50, color="gray", ls=":", lw=.6)
+    axr.fill_between(x, p.rsi_high, 100, color=RED, alpha=.08)
+    axr.fill_between(x, 0, p.rsi_low, color=GREEN, alpha=.08)
+    if first_hour:
+        axr.axvspan(first_hour[0] - .5, first_hour[-1] + .5, color=GOLD, alpha=.12)
+    axr.set_ylim(0, 100)
+    axr.set_ylabel(f"RSI {p.rsi_period}")
+    axr.grid(alpha=.25)
+    pos_gamma = day["gex_bn"] > 0
+    banner = "DÍA DE REVERSIÓN (gamma positivo)" if pos_gamma else "DÍA DE TENDENCIA (gamma negativo)"
+    ax.text(0.99, 0.985, banner, transform=ax.transAxes, ha="right", va="top", fontsize=13, weight="bold", color="white",
+            bbox=dict(boxstyle="round,pad=0.4", fc=GREEN if pos_gamma else RED, ec="none"))
+    regime = "gamma POSITIVO (reversión)" if pos_gamma else "gamma NEGATIVO (tendencia)"
     decision = f"OPERA ({len(trades)} operación(es))" if len(trades) else (f"NO OPERA: {why_not}" if why_not else "opera pero no hubo entrada")
-    ax.set_title(f"{pd.Timestamp(date):%a %d-%b-%Y} | {regime} | GEX {day['gex_bn']:+.1f} mil millones | EM {em:.1f} pts | {decision}", fontsize=12, weight="bold")
+    ax.set_title(f"{pd.Timestamp(date):%a %d-%b-%Y} | {regime} | GEX {day['gex_bn']:+.1f} mil millones | EXPECTED MOVEMENT {em:.1f} pts | {decision}", fontsize=12, weight="bold")
     ax.text(0.01, 0.01, f"base ES-SPX {day['basis']:.1f} | salto nocturno {day['gap_nocturno']:+.1f} pts | c=n: confirmaciones (de 3) | * = no pasa el filtro",
             transform=ax.transAxes, fontsize=8, color="dimgray")
     ax.set_ylabel("ES")
