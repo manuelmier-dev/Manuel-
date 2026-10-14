@@ -20,6 +20,10 @@ def _side(df: pd.DataFrame, right: str, cols: list[str]) -> pd.DataFrame:
     return x.set_index("strike")[cols].add_suffix("_" + right.lower())
 
 
+# Con Theta el straddle de las 9:20 es de ese momento (en vivo), no del cierre previo como en los archivos de TradeStation.
+# En 42 días (14-oct-2026): EM de TradeStation / straddle de Theta = 0.98 de mediana (1.06 de media) -> factor 1.0, no 0.70.
+# Además el straddle de Theta correlaciona 0.55 con el rango real del día; el EM de TradeStation, 0.00 (muestra chica).
+THETA_EM_FACTOR = 1.0
 RAW_COLS = ["strike", "bid_c", "ask_c", "bid_p", "ask_p", "oi_c", "oi_p"]
 
 
@@ -42,7 +46,7 @@ def summary_from_table(trade_date: pd.Timestamp, raw: pd.DataFrame, snapshot_et:
     z["mid_p"] = (z["bid_p"] + z["ask_p"]) / 2
     if z.dropna(subset=["mid_c", "mid_p"]).empty:
         raise ValueError("Sin cotizaciones válidas de call y put en el mismo strike")
-    out = _summarize(z, pd.Timestamp(trade_date), snapshot_et, float("nan"), "estimada")
+    out = _summarize(z, pd.Timestamp(trade_date), snapshot_et, float("nan"), "estimada", em_factor=THETA_EM_FACTOR)
     out["fuente"] = "theta"
     return out
 

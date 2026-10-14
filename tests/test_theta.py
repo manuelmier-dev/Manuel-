@@ -27,7 +27,7 @@ class TestThetaSnapshot(unittest.TestCase):
         self.assertAlmostEqual(out["spot"], S, delta=2)
         self.assertEqual(out["gamma_fuente"], "estimada")
         self.assertTrue(np.isnan(out["em_tradestation"]))
-        self.assertAlmostEqual(out["em_proxy"], 0.70 * out["em_straddle"])
+        self.assertAlmostEqual(out["em_proxy"], out["em_straddle"])           # Theta: en vivo, factor 1.0
         self.assertEqual((out["call_wall_oi"], out["put_wall_oi"]), (5020.0, 4980.0))
         self.assertEqual(out["snapshot_et"], "09:20")
 

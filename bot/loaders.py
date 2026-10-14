@@ -131,7 +131,8 @@ def _table_no_gamma(raw: pd.DataFrame, trade_date: pd.Timestamp) -> pd.DataFrame
     return z
 
 
-def _summarize(z: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et, em_ts: float, gamma_source: str) -> dict:
+def _summarize(z: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et, em_ts: float, gamma_source: str,
+               em_factor: float = EM_PROXY_FACTOR) -> dict:
     """Resumen del día a partir de la tabla por strike. z: strike, oi_c, oi_p, mid_c, mid_p (y g_c, g_p si el archivo trae gamma)."""
     spot = _spot_by_parity(z)
     if gamma_source == "archivo":
@@ -150,7 +151,7 @@ def _summarize(z: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et, em_ts: fl
     g_all = gamma_exposure(chain, spot)
     g = gamma_exposure(chain[(chain["strike"] - spot).abs() <= GEX_WINDOW_PTS], spot)
     em_straddle = expected_move(quotes, spot)
-    em_proxy = EM_PROXY_FACTOR * em_straddle
+    em_proxy = em_factor * em_straddle
     em_ref = em_ts if pd.notna(em_ts) else em_proxy
     call_1em = _max_oi_strike(z[(z["strike"] >= spot) & (z["strike"] <= spot + em_ref)], "oi_c")
     put_1em = _max_oi_strike(z[(z["strike"] <= spot) & (z["strike"] >= spot - em_ref)], "oi_p")
