@@ -14,8 +14,15 @@ def backtest_from_summary(summary: pd.DataFrame, bars: pd.DataFrame, p: Params =
     return trades, skipped, days, skipped_days
 
 
+FREEZE_DATE = "2026-10-14"      # las reglas se congelaron este día; lo posterior es "fuera de muestra" (ver REGLAS.md)
+
+
 def report(trades: pd.DataFrame, skipped: pd.DataFrame, days: pd.DataFrame) -> dict:
     out = {"general": summarize(trades, skipped, len(days))}
+    if not trades.empty:
+        after = trades[pd.to_datetime(trades["date"]) > pd.Timestamp(FREEZE_DATE)]
+        n_days_after = int((pd.to_datetime(pd.Series(days.index)) > pd.Timestamp(FREEZE_DATE)).sum())
+        out["fuera_de_muestra_desde_" + FREEZE_DATE] = summarize(after, skipped.iloc[0:0], n_days_after)
     if not trades.empty:
         for n, t in trades.groupby("n"):
             out[f"entrada_{n}"] = summarize(t, skipped.iloc[0:0], t["date"].nunique())
@@ -46,7 +53,7 @@ def sweep(summary: pd.DataFrame, bars: pd.DataFrame, base: Params = Params(), gr
 
     grid = grid or {
         "wall": list(WALL_MODES), "stop_frac": [0.2, 0.3, 0.4], "target_frac": [0.5, 0.9],
-        "confirmations_required": [1, 2, 3], "entry_start": [time(9, 30), time(9, 35)],
+        "confirmations_required": [1, 2, 3], "entry_start": [time(9, 30), time(9, 35)], "require_rejection": [False, True],
     }
     keys = list(grid)
     days_cache: dict = {}

@@ -93,6 +93,9 @@ def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params()):
             if side is None or confirmations(row, side, p) < p.confirmations_required:
                 i += 1
                 continue
+            if p.require_rejection and ((side == "short" and row["close"] >= call_w) or (side == "long" and row["close"] <= put_w)):
+                i += 1                      # la barra cerró del lado de afuera del wall: se rompió, no rebotó
+                continue
 
             nxt = b.iloc[i + 1]
             d = 1 if side == "long" else -1

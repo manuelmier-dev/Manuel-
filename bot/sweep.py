@@ -18,7 +18,7 @@ if __name__ == "__main__":
     table.to_csv(out, index=False)
     pd.set_option("display.width", 200)
     print(f"{len(table)} combinaciones guardadas en {out}")
-    for col in ["wall", "stop_frac", "target_frac", "confirmations_required", "entry_start"]:
+    for col in ["wall", "stop_frac", "target_frac", "confirmations_required", "entry_start", "require_rejection"]:
         agg = table.groupby(col).agg(operaciones=("operaciones", "mean"), resultado_medio=("resultado_total_usd", "mean"),
                                      peor_caida_media=("peor_caida_usd", "mean"), combinaciones_con_ganancia=("resultado_total_usd", lambda s: int((s > 0).sum())))
         print(f"\nPromedio por {col}:\n", agg.round(0).to_string())

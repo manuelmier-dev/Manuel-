@@ -92,3 +92,7 @@ cierre de ES del día anterior, contra 0.85 con la apertura). Por eso la primera
 - `python -m bot.sweep`: mapa de sensibilidad (stop, objetivo, confirmaciones, hora de inicio, wall). Diagnóstico, no para elegir el "mejor".
 - Diagnóstico de la primera corrida (con la alineación vieja): 11 de 19 stops cayeron en la misma barra de la entrada;
   las 6 entradas de las 9:35 perdieron todas. Hipótesis por probar, no regla.
+
+## Reglas congeladas y fuera de muestra (14-oct-2026)
+Ver `REGLAS.md`. `python -m bot.run_backtest` ahora separa en el reporte lo posterior al 14-oct ("fuera_de_muestra_desde_2026-10-14").
+`Params.entry_start` = 9:35 (provisional). `Params.require_rejection` existe pero está en prueba y apagado; `bot.sweep` lo incluye en el mapa.

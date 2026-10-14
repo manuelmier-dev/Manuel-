@@ -53,5 +53,37 @@ class TestIncompleteDay(unittest.TestCase):
         self.assertEqual(skipped.iloc[0]["reason"], "sesion_incompleta")
 
 
+class TestRejection(unittest.TestCase):
+    @staticmethod
+    def spike_day(high, close):
+        """Día plano en 5000 con una sola barra (la 12) que sube a 'high' y cierra en 'close'. Wall de calls en 5040, EM 40."""
+        b, d = scenario([5000])
+        for col in ("open", "high", "low", "close"):
+            b[col] = 5000.0
+        i = 12
+        b.iloc[i, b.columns.get_loc("high")] = high
+        b.iloc[i, b.columns.get_loc("close")] = close
+        for col in ("open", "high", "low", "close"):                 # y el precio se queda donde cerró la barra de la señal
+            b.iloc[i + 1:, b.columns.get_loc(col)] = close
+        return b, d
+
+    def test_breakout_bar_is_blocked_only_when_rejection_is_required(self):
+        from dataclasses import replace
+        b, d = self.spike_day(high=5050.0, close=5050.0)           # cierra ARRIBA del wall: se rompió
+        base = replace(P, confirmations_required=0)
+        free, _ = run_backtest(b, d, replace(base, require_rejection=False))
+        strict, _ = run_backtest(b, d, replace(base, require_rejection=True))
+        self.assertGreaterEqual(len(free), 1)
+        self.assertEqual(free.iloc[0]["side"], "short")
+        self.assertEqual(len(strict), 0)
+
+    def test_rejected_touch_is_allowed(self):
+        from dataclasses import replace
+        b, d = self.spike_day(high=5045.0, close=5030.0)           # tocó el wall pero cerró debajo: rebote (y luego se queda en 5030)
+        strict, _ = run_backtest(b, d, replace(P, confirmations_required=0, require_rejection=True))
+        self.assertGreaterEqual(len(strict), 1)
+        self.assertEqual(strict.iloc[0]["side"], "short")
+
+
 if __name__ == "__main__":
     unittest.main()
