@@ -62,7 +62,7 @@ def build_days(summary: pd.DataFrame, es_bars: pd.DataFrame, snapshot: time = ti
             skipped.append(f"{d.date()}: base ES-SPX de {carry:.0f} pts fuera de lo normal (¿precios ajustados o zona horaria?)")
             continue
         center = es_now - carry                       # precio real de las 9:20 en coordenadas SPX
-        em = float(r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_straddle"])
+        em = float(r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_proxy"])
         if wall_mode == "oi_1em" and isinstance(r.get("_table"), pd.DataFrame):
             t = r["_table"]
             cw = _max_oi(t, "oi_c", center, center + em)

@@ -96,3 +96,12 @@ cierre de ES del día anterior, contra 0.85 con la apertura). Por eso la primera
 ## Reglas congeladas y fuera de muestra (14-oct-2026)
 Ver `REGLAS.md`. `python -m bot.run_backtest` ahora separa en el reporte lo posterior al 14-oct ("fuera_de_muestra_desde_2026-10-14").
 `Params.entry_start` = 9:35 (provisional). `Params.require_rejection` existe pero está en prueba y apagado; `bot.sweep` lo incluye en el mapa.
+
+## Historia con Theta Data (confirmado por su soporte, 14-oct-2026)
+- Plan Options Standard de Manuel: opciones SPX a nivel de tick desde 2016 (cotizaciones, operaciones, OHLC, Open Interest, IV y griegas de primer orden).
+  La gamma NO viene (es de segundo orden): se calcula con `gamma_from_quotes`. Índice SPX: plan gratis, solo fin de día. ES: Theta no ofrece futuros.
+- `bot/theta_snapshot.py` (`summary_from_theta`): del par (cotizaciones de las 9:20, Open Interest) al mismo resumen del día que produce el lector de TradeStation.
+  Sin el EM de TradeStation, el EM de referencia es `0.70 x straddle` (`EM_PROXY_FACTOR`; en 30 días reales: error medio 4.4 pts, mediana 8%, correlación 0.78).
+- Falta (necesita ejemplos reales de la API): el código que consulta Theta. Ventana recomendada: desde mayo de 2022, cuando las 0DTE pasaron a ser diarias.
+- Validación obligatoria antes de usar años: recalcular con Theta los ~40 días que ya se tienen de TradeStation y comparar Open Interest, spot, GEX y walls.
+- ES (barras de 5 min con pre-mercado) saldrá de la API de TradeStation (sin costo), no de Theta ni de QuantConnect.

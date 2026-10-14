@@ -71,11 +71,11 @@ class TestDays(unittest.TestCase):
         # la base sale del CIERRE de ES del día anterior (7800) menos el spot del archivo, no del precio de las 9:15
         self.assertAlmostEqual(row["basis"], 7800.0 - summ.iloc[0]["spot"])
 
-    def test_em_falls_back_to_straddle(self):
+    def test_em_falls_back_to_proxy(self):
         summ = pd.DataFrame([parse_chain_frame(fake_sheet(em_header="x"), pd.Timestamp(2026, 10, 13))])
         summ["date"] = pd.Timestamp(2024, 1, 3)
         days, _ = build_days(summ, self._bars())
-        self.assertEqual(days.iloc[0]["em_pts"], summ.iloc[0]["em_straddle"])
+        self.assertEqual(days.iloc[0]["em_pts"], summ.iloc[0]["em_proxy"])   # sin EM de TradeStation: 0.70 x straddle
 
     def test_skips_day_without_premarket_bar(self):
         summ = pd.DataFrame([parse_chain_frame(fake_sheet(), pd.Timestamp(2026, 10, 13))])

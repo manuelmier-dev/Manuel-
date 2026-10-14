@@ -19,6 +19,7 @@ from .gex import expected_move, gamma_exposure, gamma_from_quotes
 NAME_TZ = "America/Merida"      # zona de la hora que aparece en el nombre del archivo (SUPUESTO; ajustable)
 NY = "America/New_York"
 OPEN_NY = pd.Timestamp("09:30").time()
+EM_PROXY_FACTOR = 0.70          # cuando no hay EM de TradeStation (historia de Theta): 0.70 x straddle. En 30 días reales: error medio de 4.4 pts, mediana 8%
 GEX_WINDOW_PTS = 90.0           # el GEX se calcula con los strikes a ±90 pts del precio (los archivos viejos llegan a -83 y +79), para comparar archivos de distinto ancho
 
 # columnas del formato completo: calls a la izquierda, strike al centro, puts a la derecha
@@ -124,12 +125,10 @@ def _table_no_gamma(raw: pd.DataFrame, trade_date: pd.Timestamp) -> pd.DataFrame
     return z
 
 
-def parse_chain_frame(raw: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et=None) -> dict:
-    """raw: la hoja leída sin encabezados. Devuelve el resumen del día para el vencimiento 0DTE."""
-    layout = _layout(raw)
-    z = _table_full(raw, trade_date) if layout == "completo" else _table_no_gamma(raw, trade_date)
+def _summarize(z: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et, em_ts: float, gamma_source: str) -> dict:
+    """Resumen del día a partir de la tabla por strike. z: strike, oi_c, oi_p, mid_c, mid_p (y g_c, g_p si el archivo trae gamma)."""
     spot = _spot_by_parity(z)
-    if layout == "completo":
+    if gamma_source == "archivo":
         g_c, g_p = z["g_c"], z["g_p"]
     else:
         g_c = g_p = pd.Series(gamma_from_quotes(z["strike"], z["mid_c"], z["mid_p"], spot).values, index=z.index)
@@ -144,18 +143,19 @@ def parse_chain_frame(raw: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et=N
     ]).dropna()
     g_all = gamma_exposure(chain, spot)
     g = gamma_exposure(chain[(chain["strike"] - spot).abs() <= GEX_WINDOW_PTS], spot)
-    em_ts = _em_tradestation(raw)
     em_straddle = expected_move(quotes, spot)
-    em_ref = em_ts if pd.notna(em_ts) else em_straddle
+    em_proxy = EM_PROXY_FACTOR * em_straddle
+    em_ref = em_ts if pd.notna(em_ts) else em_proxy
     call_1em = _max_oi_strike(z[(z["strike"] >= spot) & (z["strike"] <= spot + em_ref)], "oi_c")
     put_1em = _max_oi_strike(z[(z["strike"] <= spot) & (z["strike"] >= spot - em_ref)], "oi_p")
     return {
         "_table": z[["strike", "oi_c", "oi_p"]].copy(),     # Open Interest por strike (para recalcular walls alrededor del precio real)
         "date": trade_date.date(),
-        "snapshot_et": snapshot_et.strftime("%H:%M") if snapshot_et is not None else "",
-        "gamma_fuente": "archivo" if layout == "completo" else "estimada",
+        "snapshot_et": snapshot_et.strftime("%H:%M") if hasattr(snapshot_et, "strftime") else (snapshot_et or ""),
+        "gamma_fuente": gamma_source,
         "spot": spot,
         "em_straddle": em_straddle,
+        "em_proxy": em_proxy,
         "em_tradestation": em_ts,
         "gex_bn": g["total_bn"],
         "gex_bn_total": g_all["total_bn"],            # con todos los strikes del archivo
@@ -170,6 +170,13 @@ def parse_chain_frame(raw: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et=N
         "strike_max": float(z["strike"].max()),
         "n_strikes": int(len(z)),
     }
+
+
+def parse_chain_frame(raw: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et=None) -> dict:
+    """raw: la hoja leída sin encabezados. Devuelve el resumen del día para el vencimiento 0DTE."""
+    layout = _layout(raw)
+    z = _table_full(raw, trade_date) if layout == "completo" else _table_no_gamma(raw, trade_date)
+    return _summarize(z, trade_date, snapshot_et, _em_tradestation(raw), "archivo" if layout == "completo" else "estimada")
 
 
 def read_raw(path) -> pd.DataFrame:

@@ -54,7 +54,7 @@ def _post_close(bars: pd.DataFrame, d, em: float) -> dict:
 def build_journal(summary: pd.DataFrame, es_bars: pd.DataFrame | None = None, p: Params = Params()) -> pd.DataFrame:
     rows = []
     for _, r in summary.iterrows():
-        em = r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_straddle"]
+        em = r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_proxy"]
         day = pd.Series({"gex_bn": r["gex_bn"], "gex_ratio": r["gex_ratio"], "em_pts": float(em)})
         why = skip_reason(day, p)
         row = {
