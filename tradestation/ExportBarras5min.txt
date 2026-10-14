@@ -13,7 +13,7 @@ inputs:
 	FilePath( "C:\Users\Macbook\Dropbox\Bot Claude\ES_5min.csv" );
 
 variables:
-	OK( false ),
+	OK( 0 ),
 	Linea( "" );
 
 once
