@@ -1,0 +1,5 @@
+# Reglas permanentes para Claude (Manuel y Ruth)
+
+- Al INICIAR cada conversación nueva, la PRIMERA línea de la respuesta es la fecha y hora actuales
+  (obtenerlas con `date`; zona Mérida/CDMX y Nueva York), para entender mejor el hilo.
+- Las demás reglas de estilo (español, simple, corto, semáforos, cierre ✅/🤖/🙋) siguen vigentes.
