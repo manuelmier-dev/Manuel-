@@ -6,6 +6,10 @@ el cierre del día anterior, no el precio de las 9:20. Por eso:
   con la mediana de los últimos 5 días;
 - el precio real de las 9:20 en coordenadas SPX es  ES(9:15) - carry;
 - los walls "dentro de ±1 EM" se buscan alrededor de ese precio real, no del spot viejo.
+
+Hallazgo (14-oct-2026, comparando 42 días): las cotizaciones de Theta a las 9:20 SÍ son del momento (NBBO en vivo; reflejan el
+movimiento de la noche), a diferencia de las cadenas de TradeStation. En un día de Theta (fuente == "theta") el spot por paridad
+ya es el precio real de las 9:20: la base ES - SPX es ES(9:15) - spot y el centro es el propio spot, sin usar el cierre previo.
 """
 from datetime import time
 
@@ -56,12 +60,13 @@ def build_days(summary: pd.DataFrame, es_bars: pd.DataFrame, snapshot: time = ti
             skipped.append(f"{d.date()}: no hay cierre de ES del día anterior")
             continue
         es_prev, es_now = prev[1], float(done["close"].iloc[-1])
-        bases.append(es_prev - float(r["spot"]))
+        live = r.get("fuente") == "theta"                 # spot de las 9:20 en vivo (Theta) o del cierre previo (cadenas de TradeStation)
+        bases.append((es_now if live else es_prev) - float(r["spot"]))
         carry = float(np.median(bases[-CARRY_WINDOW:]))
         if not CARRY_RANGE[0] <= carry <= CARRY_RANGE[1]:
             skipped.append(f"{d.date()}: base ES-SPX de {carry:.0f} pts fuera de lo normal (¿precios ajustados o zona horaria?)")
             continue
-        center = es_now - carry                       # precio real de las 9:20 en coordenadas SPX
+        center = float(r["spot"]) if live else es_now - carry   # precio real de las 9:20 en coordenadas SPX
         em = float(r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_proxy"])
         if wall_mode == "oi_1em" and isinstance(r.get("_table"), pd.DataFrame):
             t = r["_table"]

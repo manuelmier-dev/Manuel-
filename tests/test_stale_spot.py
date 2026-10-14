@@ -44,6 +44,17 @@ class TestStaleSpot(unittest.TestCase):
         self.assertEqual(r["call_wall"], 5040.0)     # 5010 tiene más OI pero queda debajo del precio real; 5200 está fuera de ±1 EM
         self.assertEqual(r["put_wall"], 5000.0)      # entre 4990 y 5030 el mayor OI de puts es 5000
 
+    def test_theta_spot_is_live_so_it_is_the_center_and_the_base_uses_es_915(self):
+        # Theta: el spot de las 9:20 ya es el precio real (5030). ES a las 9:15 = 5080 -> base 50, sin usar el cierre previo (5050 sería base 20)
+        t = table({5040.0: 4000}, {5000.0: 5000})
+        r0 = row("2024-01-03", 5030.0, 40.0, t)
+        r0["fuente"] = "theta"
+        days, skipped = build_days(pd.DataFrame([r0]), bars_for("2024-01-03", 5050.0, 5080.0))
+        self.assertEqual(skipped, [])
+        r = days.iloc[0]
+        self.assertEqual((r["center_spx"], r["basis"]), (5030.0, 50.0))
+        self.assertEqual(r["gap_nocturno"], 30.0)
+
     def test_global_oi_mode_keeps_file_walls(self):
         t = table({}, {})
         days, _ = build_days(pd.DataFrame([row("2024-01-03", 5000.0, 40.0, t)]), bars_for("2024-01-03", 5050.0, 5080.0), wall_mode="oi")
