@@ -4,12 +4,13 @@
   *** (con una captura) y se corrige en minutos.
 
   Uso: gráfica de @ES a 5 minutos, con horario extendido (que se vea la madrugada), rango del 1-ago-2026 a hoy.
-  Antes crea la carpeta C:\TS_Export en Windows. Inserta el indicador en la gráfica; el archivo queda en FilePath.
+  El archivo queda en la carpeta de Dropbox de la computadora de TradeStation (se sincroniza solo a las demás).
+  Si esa carpeta fuera distinta, cambia FilePath en las entradas del indicador.
   Cada barra se escribe con su HORA DE CIERRE (así numera TradeStation) y la fecha en formato EasyLanguage
   (1261013 = 13-oct-2026). El programa de Python ya sabe leer eso. }
 
 inputs:
-	FilePath( "C:\TS_Export\ES_5min.csv" );
+	FilePath( "C:\Users\Macbook\Dropbox\Bot Claude\ES_5min.csv" );
 
 variables:
 	OK( false ),
