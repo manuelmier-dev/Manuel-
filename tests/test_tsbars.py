@@ -49,6 +49,18 @@ class TestTradeStationBars(unittest.TestCase):
         self.assertEqual(b.index[0], pd.Timestamp("2026-10-12 09:00", tz=NY))
         self.assertEqual(b.loc[pd.Timestamp("2026-10-13 09:30", tz=NY), "volume"], 5000)
 
+    def test_repeated_header_and_duplicate_bars_are_handled(self):
+        path = ts_csv()
+        with open(path) as f:
+            lines = f.read().splitlines()
+        # encabezado repetido a mitad del archivo y una barra repetida con otro cierre (el último valor manda)
+        lines = lines[:50] + [lines[0], lines[49].replace("7800.50,", "7811.00,", 1)] + lines[50:]
+        with open(path, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        b = load_tradestation_bars_csv(path)
+        self.assertEqual(len(b), len(load_tradestation_bars_csv(ts_csv())))
+        self.assertEqual(b.iloc[48]["close"], 7811.00)
+
     def test_wrong_timezone_is_detected(self):
         with self.assertRaises(ValueError):
             load_tradestation_bars_csv(ts_csv(shift_hours=1))

@@ -12,10 +12,12 @@ NY = "America/New_York"
 
 
 def load_tradestation_bars_csv(path, bar_minutes: int = 5, check_tz: bool = True) -> pd.DataFrame:
-    raw = pd.read_csv(path, dtype={"fecha_el": "int64", "hora_cierre": "int64"})
+    raw = pd.read_csv(path, dtype=str)
     need = {"fecha_el", "hora_cierre", "open", "high", "low", "close", "volume"}
     if not need <= set(raw.columns):
         raise ValueError(f"Faltan columnas {sorted(need - set(raw.columns))}")
+    raw = raw[raw["fecha_el"] != "fecha_el"].dropna(subset=["fecha_el"])   # el indicador puede repetir el encabezado
+    raw = raw.astype({"fecha_el": "int64", "hora_cierre": "int64"})
     d = raw["fecha_el"]
     date = pd.to_datetime(((1900 + d // 10000) * 10000 + (d // 100 % 100) * 100 + d % 100).astype(str), format="%Y%m%d")
     hhmm = raw["hora_cierre"]
