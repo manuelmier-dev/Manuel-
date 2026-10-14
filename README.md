@@ -81,4 +81,4 @@ Con pocos días no concluye nada; sirve para encontrar errores y ver el comporta
   (`oi`, `oi_1em`, `gex`) lado a lado.
 - Si un lado no tiene wall (OI cero en el rango), ese lado no genera entradas y el objetivo es solo el 90% del EM.
 - Desde el 15-oct Manuel exportará todos los strikes. Para comparar con los archivos viejos, el GEX (`gex_bn`, `gex_ratio`) se calcula con los
-  strikes a ±75 pts del precio; `gex_bn_total` usa todos los strikes del archivo.
+  strikes a ±90 pts del precio (todos los archivos viejos caben en esa ventana, así que sus valores no cambian); `gex_bn_total` usa todos los strikes del archivo.

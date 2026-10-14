@@ -19,7 +19,7 @@ from .gex import expected_move, gamma_exposure, gamma_from_quotes
 NAME_TZ = "America/Merida"      # zona de la hora que aparece en el nombre del archivo (SUPUESTO; ajustable)
 NY = "America/New_York"
 OPEN_NY = pd.Timestamp("09:30").time()
-GEX_WINDOW_PTS = 75.0           # el GEX se calcula con los strikes a ±75 pts del precio, para comparar archivos de distinto ancho
+GEX_WINDOW_PTS = 90.0           # el GEX se calcula con los strikes a ±90 pts del precio (los archivos viejos llegan a -83 y +79), para comparar archivos de distinto ancho
 
 # columnas del formato completo: calls a la izquierda, strike al centro, puts a la derecha
 C = dict(symbol=1, gamma=2, iv=3, oi=5, bid=7, ask=8)
