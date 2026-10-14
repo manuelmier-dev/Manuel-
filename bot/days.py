@@ -6,10 +6,17 @@ import pandas as pd
 NY = "America/New_York"
 
 
+WALL_MODES = {
+    "oi": ("call_wall_oi", "put_wall_oi"),                  # mayor Open Interest de todo el archivo
+    "oi_1em": ("call_wall_oi_1em", "put_wall_oi_1em"),      # mayor Open Interest dentro de ±1 EM del precio
+    "gex": ("call_wall_gex", "put_wall_gex"),               # mayor gamma
+}
+
+
 def build_days(summary: pd.DataFrame, es_bars: pd.DataFrame, snapshot: time = time(9, 20),
-               bar_minutes: int = 5, max_gap_min: int = 30) -> tuple[pd.DataFrame, list[str]]:
+               bar_minutes: int = 5, max_gap_min: int = 30, wall_mode: str = "oi_1em") -> tuple[pd.DataFrame, list[str]]:
     """Decisiones de Manuel: movimiento esperado = el de TradeStation (si falta, el straddle);
-    walls = mayor Open Interest. Base = precio de ES a las 9:20 menos el SPX de ese momento.
+    walls según `wall_mode` (por defecto el mayor Open Interest dentro de ±1 EM del precio; "oi" = mayor de todo el archivo). Base = precio de ES a las 9:20 menos el SPX de ese momento.
     Las barras de ES deben incluir pre-mercado (al menos 9:00 a 9:30)."""
     rows, skipped = [], []
     for _, r in summary.iterrows():
@@ -25,12 +32,16 @@ def build_days(summary: pd.DataFrame, es_bars: pd.DataFrame, snapshot: time = ti
         if not -30 <= basis <= 150:
             skipped.append(f"{d.date()}: base ES-SPX de {basis:.0f} pts fuera de lo normal (¿precios ajustados o zona horaria?)")
             continue
+        cw, pw = (r[c] for c in WALL_MODES[wall_mode])
+        if pd.isna(cw) and pd.isna(pw):
+            skipped.append(f"{d.date()}: sin wall ({wall_mode})")
+            continue
         em = r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_straddle"]
         rows.append({
             "date": d.date(),
             "gex_bn": r["gex_bn"], "gex_ratio": r["gex_ratio"],
             "em_pts": float(em),
-            "call_wall": r["call_wall_oi"], "put_wall": r["put_wall_oi"],
+            "call_wall": cw, "put_wall": pw,
             "basis": basis,
             "oi_date": (d - pd.tseries.offsets.BDay(1)).date(),  # OI del día hábil anterior
         })

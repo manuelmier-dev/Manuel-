@@ -60,7 +60,7 @@ class TestDays(unittest.TestCase):
     def test_build_days_uses_tradestation_em_and_oi_walls(self):
         summ = pd.DataFrame([parse_chain_frame(fake_sheet(), pd.Timestamp(2024, 1, 3).replace(year=2026, month=10, day=13))])
         summ["date"] = pd.Timestamp(2024, 1, 3)
-        days, skipped = build_days(summ, self._bars())
+        days, skipped = build_days(summ, self._bars(), wall_mode="oi")
         self.assertEqual(skipped, [])
         row = days.iloc[0]
         self.assertEqual(row["em_pts"], 22.83)

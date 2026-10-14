@@ -80,8 +80,8 @@ def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params()):
             limit = p.entry_end if entries == 0 else p.reentry_end
             if t > limit:
                 break
-            near_call = row["high"] >= call_w - tol
-            near_put = row["low"] <= put_w + tol
+            near_call = bool(pd.notna(call_w) and row["high"] >= call_w - tol)
+            near_put = bool(pd.notna(put_w) and row["low"] <= put_w + tol)
             side = None
             if near_call and not near_put:
                 side = "short"
@@ -97,7 +97,10 @@ def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params()):
             stop = entry - d * p.stop_frac * em
             opp = put_w if side == "short" else call_w
             raw_target = entry + d * p.target_frac * em
-            target = max(raw_target, opp) if side == "short" else min(raw_target, opp)
+            if pd.isna(opp):
+                target = raw_target
+            else:
+                target = max(raw_target, opp) if side == "short" else min(raw_target, opp)
             if d * (target - entry) <= 0:
                 i += 1
                 continue

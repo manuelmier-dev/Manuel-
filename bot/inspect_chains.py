@@ -12,7 +12,7 @@ if __name__ == "__main__":
     pd.set_option("display.width", 200, "display.max_columns", 30)
     if not df.empty:
         df.to_csv(out, index=False)
-        print(df.drop(columns=["file", "strike_min", "strike_max", "call_wall_gex", "put_wall_gex", "snapshot_et"]).round(2).to_string(index=False))
+        print(df.drop(columns=["file", "strike_min", "strike_max", "call_wall_gex", "put_wall_gex", "snapshot_et", "gamma_fuente"]).round(2).to_string(index=False))
         print(f"\nArchivos leídos: {len(df)}  |  guardado en {out}")
         print(f"GEX dentro de ±0.5 mil millones: {int((df['gex_bn'].abs() <= 0.5).sum())} días")
         print(f"GEX negativo: {int((df['gex_bn'] < 0).sum())} días")

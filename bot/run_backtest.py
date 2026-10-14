@@ -7,7 +7,7 @@ import sys
 
 from .journal import load_es_bars_csv
 from .loaders import summarize_folder
-from .pipeline import backtest_from_summary, report
+from .pipeline import backtest_from_summary, compare_wall_modes, report
 
 if __name__ == "__main__":
     folder, bars_path = sys.argv[1], sys.argv[2]
@@ -15,6 +15,9 @@ if __name__ == "__main__":
     summary, errors = summarize_folder(folder)
     bars = load_es_bars_csv(bars_path)
     trades, skipped, days, skipped_days = backtest_from_summary(summary, bars)
+    print("== Comparación de definiciones de wall (la primera, oi_1em, es la que se usa abajo) ==")
+    print(compare_wall_modes(summary, bars).to_string(index=False))
+    print("\n== Detalle con wall = mayor Open Interest dentro de ±1 EM ==")
     print(json.dumps(report(trades, skipped, days), indent=2, ensure_ascii=False, default=str))
     if not trades.empty:
         trades.to_csv(out, index=False)

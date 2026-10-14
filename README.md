@@ -73,3 +73,12 @@ Con pocos días no concluye nada; sirve para encontrar errores y ver el comporta
   Un archivo exportado después de las 9:30 NY se rechaza (los precios ya no son de antes de la apertura).
 - Si hay dos archivos del mismo día, queda el más tardío que sea válido (anterior a la apertura).
 - Se descartan las filas basura al final de los archivos de agosto (la delta del call no puede subir al alejarse del precio).
+
+## Definición de wall y ancho de la cadena (14-oct-2026)
+- Manuel: "lo que consideres más conveniente". Por defecto el wall de entrada es el **mayor Open Interest dentro de ±1 EM del precio**
+  (calls entre el precio y +1 EM; puts entre -1 EM y el precio). Motivo: con el mayor OI de todo el archivo, el wall quedaba en promedio
+  a 1.4 EM (call) y 1.9 EM (put), casi siempre fuera del rango del día. `python -m bot.run_backtest` compara las tres definiciones
+  (`oi`, `oi_1em`, `gex`) lado a lado.
+- Si un lado no tiene wall (OI cero en el rango), ese lado no genera entradas y el objetivo es solo el 90% del EM.
+- Desde el 15-oct Manuel exportará todos los strikes. Para comparar con los archivos viejos, el GEX (`gex_bn`, `gex_ratio`) se calcula con los
+  strikes a ±75 pts del precio; `gex_bn_total` usa todos los strikes del archivo.

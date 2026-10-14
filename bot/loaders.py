@@ -19,6 +19,7 @@ from .gex import expected_move, gamma_exposure, gamma_from_quotes
 NAME_TZ = "America/Merida"      # zona de la hora que aparece en el nombre del archivo (SUPUESTO; ajustable)
 NY = "America/New_York"
 OPEN_NY = pd.Timestamp("09:30").time()
+GEX_WINDOW_PTS = 75.0           # el GEX se calcula con los strikes a ±75 pts del precio, para comparar archivos de distinto ancho
 
 # columnas del formato completo: calls a la izquierda, strike al centro, puts a la derecha
 C = dict(symbol=1, gamma=2, iv=3, oi=5, bid=7, ask=8)
@@ -62,6 +63,13 @@ def _spot_by_parity(z: pd.DataFrame) -> float:
     ok = z.dropna(subset=["mid_c", "mid_p"])
     near = ok.iloc[(ok["mid_c"] - ok["mid_p"]).abs().argsort()[:5]]
     return float((near["strike"] + near["mid_c"] - near["mid_p"]).median())
+
+
+def _max_oi_strike(side: pd.DataFrame, col: str) -> float:
+    side = side.dropna(subset=[col])
+    if side.empty or side[col].max() <= 0:
+        return float("nan")
+    return float(side.loc[side[col].idxmax(), "strike"])
 
 
 def _layout(raw: pd.DataFrame) -> str:
@@ -132,20 +140,29 @@ def parse_chain_frame(raw: pd.DataFrame, trade_date: pd.Timestamp, snapshot_et=N
         pd.DataFrame({"strike": z["strike"], "right": "C", "mid": z["mid_c"]}),
         pd.DataFrame({"strike": z["strike"], "right": "P", "mid": z["mid_p"]}),
     ]).dropna()
-    g = gamma_exposure(chain, spot)
+    g_all = gamma_exposure(chain, spot)
+    g = gamma_exposure(chain[(chain["strike"] - spot).abs() <= GEX_WINDOW_PTS], spot)
+    em_ts = _em_tradestation(raw)
+    em_straddle = expected_move(quotes, spot)
+    em_ref = em_ts if pd.notna(em_ts) else em_straddle
+    call_1em = _max_oi_strike(z[(z["strike"] >= spot) & (z["strike"] <= spot + em_ref)], "oi_c")
+    put_1em = _max_oi_strike(z[(z["strike"] <= spot) & (z["strike"] >= spot - em_ref)], "oi_p")
     return {
         "date": trade_date.date(),
         "snapshot_et": snapshot_et.strftime("%H:%M") if snapshot_et is not None else "",
         "gamma_fuente": "archivo" if layout == "completo" else "estimada",
         "spot": spot,
-        "em_straddle": expected_move(quotes, spot),
-        "em_tradestation": _em_tradestation(raw),
+        "em_straddle": em_straddle,
+        "em_tradestation": em_ts,
         "gex_bn": g["total_bn"],
+        "gex_bn_total": g_all["total_bn"],            # con todos los strikes del archivo
         "gex_ratio": g["total_bn"] / g["gross_bn"] if g["gross_bn"] else float("nan"),  # neto / total, entre -1 y 1
         "call_wall_gex": g["call_wall"],
         "put_wall_gex": g["put_wall"],
         "call_wall_oi": float(z.loc[z["oi_c"].idxmax(), "strike"]),
         "put_wall_oi": float(z.loc[z["oi_p"].idxmax(), "strike"]),
+        "call_wall_oi_1em": call_1em,                 # mayor OI de calls entre el precio y +1 EM
+        "put_wall_oi_1em": put_1em,                   # mayor OI de puts entre -1 EM y el precio
         "strike_min": float(z["strike"].min()),
         "strike_max": float(z["strike"].max()),
         "n_strikes": int(len(z)),

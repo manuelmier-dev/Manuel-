@@ -5,7 +5,7 @@ from datetime import date
 
 import pandas as pd
 
-from bot.pipeline import backtest_from_summary, report
+from bot.pipeline import backtest_from_summary, compare_wall_modes, report
 from bot.tsbars import check_bars, load_tradestation_bars_csv
 from test_bot import P, scenario
 
@@ -38,7 +38,8 @@ def premarket(date_str):
 
 def summary(spot=5000.0):
     return pd.DataFrame([{"date": pd.Timestamp("2024-01-03"), "spot": spot, "gex_bn": 1.0, "gex_ratio": 0.3,
-                          "em_tradestation": 40.0, "em_straddle": 45.0, "call_wall_oi": 5040.0, "put_wall_oi": 4960.0}])
+                          "em_tradestation": 40.0, "em_straddle": 45.0, "call_wall_oi": 5040.0, "put_wall_oi": 4960.0,
+                          "call_wall_oi_1em": 5040.0, "put_wall_oi_1em": 4960.0, "call_wall_gex": 5040.0, "put_wall_gex": 4960.0}])
 
 
 class TestTradeStationBars(unittest.TestCase):
@@ -70,6 +71,12 @@ class TestPipeline(unittest.TestCase):
         rep = report(trades, skipped, days)
         self.assertEqual(rep["general"]["operaciones"], 1)
         self.assertIn("entrada_1", rep)
+
+    def test_compare_wall_modes_gives_one_row_per_definition(self):
+        rth, _ = scenario([5030, 5015, 5004, 5000])
+        table = compare_wall_modes(summary(), pd.concat([premarket("2024-01-03"), rth]), P)
+        self.assertEqual(list(table["wall"]), ["oi", "oi_1em", "gex"])
+        self.assertTrue((table["operaciones"] == 1).all())
 
     def test_absurd_basis_skips_day(self):
         rth, _ = scenario([5030, 5015, 5004, 5000])
