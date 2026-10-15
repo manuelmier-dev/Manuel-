@@ -20,6 +20,7 @@ Muestra pequeña = no concluye. Una regla "ganadora" entre muchas se vuelve a pr
 | 15 oct 2026 | Sensibilidad de la anterior (24 combinaciones: RSI 30/33/38/42, banda 1σ/2σ, MACD A/B/ninguno) | ES 16.8 años | Con banda 2σ las 12 combinaciones son positivas (+2.2 a +5.0 pts; sin MACD t = 1.9 a 2.2; n = 168 a 198). Con banda 1σ no hay ventaja (-0.2 a +1.0 pts, t < 1.2). El efecto solo está en el extremo | Efecto estrecho: solo el extremo -2σ; sin MACD rinde igual |
 
 | 15 oct 2026 | Misma entrada, salida nueva de Manuel: barra bajista que cierra bajo la banda alta del VWAP tras tocarla (X2); la lectura literal X1 se probó solo para comparar | ES 16.8 años | X2: B +3.7 pts netos (t 1.61, +19.7 mil USD, p placebo 0.004), sin MACD +3.5 pts (t 1.89, +32.6 mil, 188 operaciones, p placebo 0.000), A +2.3 (t 0.90). X1 (primera barra roja) pierde: -0.3 a -0.9 pts. Resultado concentrado en 2020, 2024 y 2025; 2023 y 2026 negativos | Candidata débil: pasa el placebo, NO pasa t > 2. Pendiente: réplica en NQ, YM y RTY |
+| 15 oct 2026 | Búsqueda honesta de patrones (5,694 reglas de una operación al día: 8 horas x 41 condiciones x largo/corto x 13 salidas), elegir en 2010-18, confirmar en 2019-22, probar en 2023-26, con 30 repeticiones de nulos mezclados | ES 16.8 años | Mejor t en entrenamiento: 2.14 real contra 2.52 de promedio solo por suerte (máx. 3.62). Candidatas que pasan la validación: 0 (por suerte: 0.5 de promedio, máx. 5). Ninguna de las 15 mejores en entrenamiento se sostiene después | Nada: el mejor patrón real no supera lo que da el azar |
 
 ## Conclusiones
 - En 4.4 años de 0DTE y 16.8 años de ES, ninguna regla intradía probada tiene ventaja después de costos.
@@ -28,6 +29,8 @@ Muestra pequeña = no concluye. Una regla "ganadora" entre muchas se vuelve a pr
   realmente describe la posición de los market makers.)
 - Hallazgo estructural verdadero pero sin ventaja operable: el máximo o el mínimo del día cae en la primera hora el 71% de los días
   (34% el máximo, 39% el mínimo); una caminata al azar con volatilidad alta al abrir da ~66%.
+
+- Calibración: al probar ~30 ideas distintas a lo largo del día, un t de ~2 en la mejor es lo que se espera SOLO por suerte (la mejor de 5,694 reglas da t ~ 2.5 con datos sin relación real). Por eso la estrategia de reversión de Manuel (t 1.6 a 1.9 con salida X2) no se puede distinguir del azar.
 
 ## Mecánica construida (sirve para cualquier estrategia futura)
 Descarga de Theta (historia 0DTE) y de ES por la API de TradeStation; backtest con las mismas reglas que el robot; robot que decide qué haría
