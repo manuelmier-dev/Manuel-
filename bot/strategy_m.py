@@ -72,14 +72,17 @@ def _hm(s: str) -> int:
     return int(s[:2]) * 60 + int(s[3:])
 
 
-def run(df: pd.DataFrame, sig: pd.DataFrame, multi: bool = False, win_start: str = WIN_START, win_end: str = WIN_END) -> pd.DataFrame:
+def run(df: pd.DataFrame, sig: pd.DataFrame, multi: bool = False, win_start: str = WIN_START, win_end: str = WIN_END,
+        exit_mode: str = "regla") -> pd.DataFrame:
     """Entradas en la ventana; sale por la regla o a las 15:55. Una por día (multi=False) o varias, una posición a la vez (multi=True).
-    Devuelve las operaciones (en puntos, sin costos)."""
+    exit_mode: "regla" (la salida original con MACD+RSI+VWAP), "X1" (la primera barra bajista que cierra debajo de la banda alta del VWAP) o
+    "X2" (igual, pero solo después de que el precio tocó la banda alta desde la entrada: un rechazo). Devuelve las operaciones (en puntos, sin costos)."""
     t = df.index
     mins = np.array(t.hour * 60 + t.minute)
     day = np.array(t.date)
-    o, c = df["open"].to_numpy(), df["close"].to_numpy()
+    o, c, hi, up = df["open"].to_numpy(), df["close"].to_numpy(), df["high"].to_numpy(), df["vwap_up"].to_numpy()
     e_arr, x_arr = sig["entry"].to_numpy(), sig["exit"].to_numpy()
+    bear_below = (c < o) & (c < up)                           # barra bajista que cierra debajo de la banda alta del VWAP
     w0, w1, fl = _hm(win_start), _hm(win_end), 15 * 60 + 55
     n = len(df)
     trades, last_day, busy_until = [], None, -1
@@ -92,12 +95,19 @@ def run(df: pd.DataFrame, sig: pd.DataFrame, multi: bool = False, win_start: str
         if not multi and day[j] == last_day:
             continue
         last_day = day[j]
-        k = j
+        k, touched = j, False
         while True:                                           # recorre barras del mismo día
             if mins[k] >= fl or k + 1 >= n or day[k + 1] != day[k]:
                 xp, why, kx = c[k], "hora", k
                 break
-            if x_arr[k] and k >= j:
+            touched = touched or bool(hi[k] >= up[k])           # (solo se usa en X2)
+            if exit_mode == "regla":
+                hit = bool(x_arr[k])
+            elif exit_mode == "X1":
+                hit = bool(bear_below[k])
+            else:
+                hit = touched and bool(bear_below[k])
+            if hit:
                 xp, why, kx = o[k + 1], "regla", k + 1
                 break
             k += 1
@@ -140,7 +150,7 @@ def stats(tr: pd.DataFrame, instrument: str = "ES") -> dict:
     net = tr["pts"] - cost_pts
     eq = (net * pv).cumsum()
     return {"n": len(tr), "pts_bruto": round(tr["pts"].mean(), 2), "pts_neto": round(net.mean(), 2),
-            "t_neto": round(net.mean() / (net.std(ddof=1) / np.sqrt(len(net))), 2) if len(net) > 2 else np.nan,
+            "t_neto": round(net.mean() / (net.std(ddof=1) / np.sqrt(len(net))), 2) if len(net) > 2 and net.std(ddof=1) > 0 else np.nan,
             "aciertos_%": round(100 * (net > 0).mean(), 1), "total_usd_neto": round(net.sum() * pv, 0),
             "peor_caida_usd": round(float((eq - eq.cummax()).min()), 0), "salen_por_regla_%": round(100 * (tr["motivo"] == "regla").mean(), 1),
             "barras_promedio": round(tr["barras"].mean(), 1)}
@@ -173,14 +183,23 @@ if __name__ == "__main__":
         print(sensitivity(df, instrument).to_string(index=False))
         print("\nSi el efecto es real debería verse en muchas filas (no solo en una) y con más operaciones al aflojar las reglas. 'N' = sin MACD.")
         sys.exit(0)
-    for mode, multi, text in (("A", False, "MACD literal (histograma MENOR que la barra anterior)"), ("B", False, "MACD alternativo (histograma MAYOR: se acorta si es rojo)"),
-                              ("N", False, "SIN condición de MACD (RSI, banda y barra alcista)")):
-        tr = run(df, signals(df, mode), multi=multi)
-        print(f"\n===== Modo {mode} / {'varias' if multi else 'una por día'}: {text} =====")
-        print(pd.Series(stats(tr, instrument)).to_string())
-        if len(tr) >= 20:
-            print("Placebo (entrada al azar en la misma ventana, misma duración):", placebo(df, tr))
-            yr = pd.to_datetime(tr["date"]).dt.year
-            print("\nPor año:")
-            print(pd.DataFrame({int(y): stats(g, instrument) for y, g in tr.groupby(yr)}).T.to_string())
-    print("\nSe aprueba solo si el neto es positivo, t > 2, p < 0.017 (0.05 / 3 variantes) contra el placebo y el signo se repite en la mayoría de los años.")
+    rows = []
+    for mode, text in (("A", "MACD menor"), ("B", "MACD mayor"), ("N", "sin MACD")):
+        for ex, extext in (("X1", "primera barra bajista bajo la banda alta"), ("X2", "barra bajista bajo la banda alta tras TOCARLA")):
+            tr = run(df, signals(df, mode), exit_mode=ex)
+            st = stats(tr, instrument)
+            rows.append({"entrada": f"{mode} ({text})", "salida": f"{ex} ({extext})", **{k: st.get(k) for k in ("n", "pts_neto", "t_neto", "aciertos_%", "total_usd_neto", "peor_caida_usd", "salen_por_regla_%", "barras_promedio")},
+                         "p_placebo": placebo(df, tr)["p_valor"] if len(tr) >= 20 else np.nan})
+            if len(tr) >= 5 and (mode == "N" or (mode == "B" and ex == "X2")):
+                yr = pd.to_datetime(tr["date"]).dt.year
+                rows[-1]["_por_anio"] = pd.DataFrame({int(y): stats(g, instrument) for y, g in tr.groupby(yr)}).T.to_string()
+    print(f"Instrumento: {instrument} (costo {costs(instrument)[0]:.2f} pts = {costs(instrument)[0] * costs(instrument)[1]:.0f} USD por operación)")
+    print(pd.DataFrame([{k: v for k, v in r.items() if k != "_por_anio"} for r in rows]).to_string(index=False))
+    for r in rows:
+        if "_por_anio" in r:
+            print(f"\nPor año: entrada {r['entrada']} / salida {r['salida']}")
+            print(r["_por_anio"])
+    print("\n--- Salida ORIGINAL (MACD + RSI + VWAP, para comparar) ---")
+    for mode in ("A", "B", "N"):
+        print(mode, stats(run(df, signals(df, mode)), instrument))
+    print("\nSe aprueba solo si el neto es positivo, t > 2, p < 0.008 (0.05 / 6 variantes) contra el placebo y el signo se repite en la mayoría de los años.")

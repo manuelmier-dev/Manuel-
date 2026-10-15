@@ -73,6 +73,25 @@ class TestStrategyM(unittest.TestCase):
         self.assertGreaterEqual(signals(df, "N", rsi_th=42.0)["entry"].sum(), n["entry"].sum())
         self.assertIn("vwap_sd", df.columns)
 
+    def test_new_exit_x1_leaves_on_first_bearish_bar_below_upper_band_and_x2_waits_for_the_touch(self):
+        df = add_manuel_indicators(one_day_bars())
+        sig = pd.DataFrame({"entry": False, "exit": False}, index=df.index)
+        sig.loc[pd.Timestamp("2024-03-05 07:35", tz=NY), "entry"] = True
+        # barras de prueba: una barra roja justo después de entrar, y más tarde el precio toca la banda alta y cierra una roja debajo
+        df = df.copy()
+        i0 = df.index.get_loc(pd.Timestamp("2024-03-05 07:40", tz=NY))
+        df.iloc[i0, df.columns.get_loc("close")] = df.iloc[i0]["open"] - 1.0            # barra bajista en la propia barra de entrada
+        df["vwap_up"] = df["close"].max() + 50.0                                         # banda alta lejana: cualquier barra roja cierra debajo
+        x1 = run(df, sig, exit_mode="X1").iloc[0]
+        self.assertEqual(x1["exit_time"], pd.Timestamp("2024-03-05 07:45", tz=NY))       # sale en la apertura de la barra siguiente
+        x2 = run(df, sig, exit_mode="X2").iloc[0]
+        self.assertEqual(x2["motivo"], "hora")                                           # el precio nunca tocó la banda: no hay rechazo, cierra a las 15:55
+        k = df.index.get_loc(pd.Timestamp("2024-03-05 11:00", tz=NY))
+        df.iloc[k, df.columns.get_loc("high")] = df["vwap_up"].iloc[k] + 1.0              # toca la banda alta
+        df.iloc[k, df.columns.get_loc("open")] = df.iloc[k]["close"] + 2.0                # y la barra es bajista (cierra debajo de la apertura y de la banda)
+        x2b = run(df, sig, exit_mode="X2").iloc[0]
+        self.assertEqual((x2b["motivo"], x2b["exit_time"]), ("regla", pd.Timestamp("2024-03-05 11:05", tz=NY)))
+
     def test_costs_per_instrument(self):
         pts, pv = costs("ES")
         self.assertAlmostEqual(pts * pv, 29.0)
