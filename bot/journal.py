@@ -35,6 +35,10 @@ def load_es_bars_csv(path) -> pd.DataFrame:
 
 def _post_close(bars: pd.DataFrame, d, em: float) -> dict:
     day = bars.loc[str(d)] if str(d) in bars.index.strftime("%Y-%m-%d") else bars.iloc[0:0]
+    return _post_close_day(day, em)
+
+
+def _post_close_day(day: pd.DataFrame, em: float) -> dict:
     s = day.between_time(SESSION_START, SESSION_END)
     if len(s) < MIN_BARS or s.index[0].time() != SESSION_START:
         return {c: np.nan for c in POST_COLS}
@@ -53,6 +57,7 @@ def _post_close(bars: pd.DataFrame, d, em: float) -> dict:
 
 def build_journal(summary: pd.DataFrame, es_bars: pd.DataFrame | None = None, p: Params = Params()) -> pd.DataFrame:
     rows = []
+    by_day = {d: g for d, g in es_bars.groupby(es_bars.index.date)} if es_bars is not None else {}     # una sola pasada (con años de barras, buscar día por día era lentísimo)
     for _, r in summary.iterrows():
         em = r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_proxy"]
         day = pd.Series({"gex_bn": r["gex_bn"], "gex_ratio": r["gex_ratio"], "em_pts": float(em)})
@@ -63,7 +68,7 @@ def build_journal(summary: pd.DataFrame, es_bars: pd.DataFrame | None = None, p:
             "call_wall_oi": r["call_wall_oi"], "put_wall_oi": r["put_wall_oi"],
             "bot_opera": why is None, "motivo_no_opera": why or "",
         }
-        row.update(_post_close(es_bars, pd.Timestamp(r["date"]).date(), float(em)) if es_bars is not None
+        row.update(_post_close_day(by_day.get(pd.Timestamp(r["date"]).date(), es_bars.iloc[0:0]), float(em)) if es_bars is not None
                    else {c: np.nan for c in POST_COLS})
         rows.append(row)
     return pd.DataFrame(rows)
