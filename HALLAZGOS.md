@@ -35,3 +35,9 @@ Muestra pequeña = no concluye. Una regla "ganadora" entre muchas se vuelve a pr
 ## Mecánica construida (sirve para cualquier estrategia futura)
 Descarga de Theta (historia 0DTE) y de ES por la API de TradeStation; backtest con las mismas reglas que el robot; robot que decide qué haría
 (bot/live.py) y envía órdenes al SIMULADOR con stop y objetivo ligados (bot/ts_orders.py, probado: compra, OCO, cancela, cierra).
+
+
+## Flujo con signo de market makers (en curso, v45)
+- Reglas F1-F4 PRE-REGISTRADAS (escritas antes de ver datos) en `bot/flow_eval.py`: F1 sigue la presión de cobertura de 9:30-10:30; F2 la contraria; F3 solo si |P| es alta (mediana de días previos); F4 solo si dealers cortos gamma. Entrada 10:30, salida 15:55 o 12:30, 29 USD/operación, placebo por barajado, 8 pruebas -> |t|>2.7 y 3 tercios con mismo signo.
+- Es un PROXY: signo inferido por precio vs bid/ask (Lee-Ready simplificado); el inventario real del dealer no es observable.
+- Sin resultados todavía (falta bajar los datos con `bot/flow.py`).
