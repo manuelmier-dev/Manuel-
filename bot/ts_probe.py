@@ -22,8 +22,8 @@ def describe_json(path) -> list[str]:
     if not isinstance(data, dict):
         return lines + [f"No es un objeto JSON sino {type(data).__name__}"]
     for k, v in data.items():
-        secret = any(w in k.lower() for w in SECRET_WORDS)
-        show = isinstance(v, (int, float, bool)) or (isinstance(v, str) and len(v) <= 40 and not secret)
+        secret = any(w in k.lower() for w in SECRET_WORDS) and k.lower() != "scope"        # "scope" (permisos concedidos) no es secreto
+        show = isinstance(v, (int, float, bool)) or (isinstance(v, str) and (len(v) <= 40 or k.lower() == "scope") and not secret)
         shown = f" = {v!r}" if show and not secret else ""
         lines.append(f"  {k}: {type(v).__name__}, largo {len(str(v))}{shown}")
     return lines
