@@ -1,6 +1,6 @@
 """Estrategia de don Manuel (15-oct-2026): compra de reversión en pre-mercado con MACD (histograma), RSI y VWAP con bandas. Solo ES, sin opciones.
 
-Uso:  python -m bot.strategy_m <barras1.csv> [<barras2.csv> ...] [--sens] [--instrumento ES|NQ|YM|RTY]
+Uso:  python -m bot.strategy_m <barras1.csv> [<barras2.csv> ...] [--sens] [--resumen] [--instrumento ES|NQ|YM|RTY]
 
 Reglas tal como las dio don Manuel + SUPUESTOS (marcados) para lo que no dijo. Todo fijado antes de ver resultados:
   Gráfica de 5 minutos, ES 24 horas. MACD (12, 26, 9) en histograma, RSI (14), VWAP de la sesión Globex (reinicia 18:00 NY) con bandas de +-2 desviaciones.
@@ -196,6 +196,8 @@ if __name__ == "__main__":
                 rows[-1]["_por_anio"] = pd.DataFrame({int(y): stats(g, instrument) for y, g in tr.groupby(yr)}).T.to_string()
     print(f"Instrumento: {instrument} (costo {costs(instrument)[0]:.2f} pts = {costs(instrument)[0] * costs(instrument)[1]:.0f} USD por operación)")
     print(pd.DataFrame([{k: v for k, v in r.items() if k != "_por_anio"} for r in rows]).to_string(index=False))
+    if "--resumen" in sys.argv:                               # solo la tabla (para correr varios mercados sin pantallas larguísimas)
+        sys.exit(0)
     for r in rows:
         if "_por_anio" in r:
             print(f"\nPor año: entrada {r['entrada']} / salida {r['salida']}")
