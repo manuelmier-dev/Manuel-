@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bot.strategy_m import add_manuel_indicators, placebo, run, signals, stats
+from bot.strategy_m import add_manuel_indicators, costs, placebo, run, signals, stats
 
 NY = "America/New_York"
 
@@ -72,6 +72,14 @@ class TestStrategyM(unittest.TestCase):
         self.assertTrue(((a["entry"] | b["entry"]) <= n["entry"]).all())          # sin MACD se cumplen al menos las de A y B
         self.assertGreaterEqual(signals(df, "N", rsi_th=42.0)["entry"].sum(), n["entry"].sum())
         self.assertIn("vwap_sd", df.columns)
+
+    def test_costs_per_instrument(self):
+        pts, pv = costs("ES")
+        self.assertAlmostEqual(pts * pv, 29.0)
+        self.assertAlmostEqual(costs("NQ")[0] * costs("NQ")[1], 14.0)
+        self.assertAlmostEqual(costs("YM")[0] * costs("YM")[1], 14.0)
+        tr = pd.DataFrame({"pts": [10.0] * 10, "motivo": ["hora"] * 10, "barras": [5] * 10})
+        self.assertAlmostEqual(stats(tr, "NQ")["total_usd_neto"], (10 - costs("NQ")[0]) * 20 * 10, places=0)
 
     def test_placebo_returns_a_probability(self):
         df = add_manuel_indicators(one_day_bars())

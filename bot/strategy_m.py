@@ -1,6 +1,6 @@
 """Estrategia de don Manuel (15-oct-2026): compra de reversión en pre-mercado con MACD (histograma), RSI y VWAP con bandas. Solo ES, sin opciones.
 
-Uso:  python -m bot.strategy_m <barras1.csv> [<barras2.csv> ...]
+Uso:  python -m bot.strategy_m <barras1.csv> [<barras2.csv> ...] [--sens] [--instrumento ES|NQ|YM|RTY]
 
 Reglas tal como las dio don Manuel + SUPUESTOS (marcados) para lo que no dijo. Todo fijado antes de ver resultados:
   Gráfica de 5 minutos, ES 24 horas. MACD (12, 26, 9) en histograma, RSI (14), VWAP de la sesión Globex (reinicia 18:00 NY) con bandas de +-2 desviaciones.
@@ -21,11 +21,20 @@ import sys
 import numpy as np
 import pandas as pd
 
-from .hyp_test import COST_PTS
+from .hyp_test import COST_PTS as ES_COST_PTS
 from .indicators import rsi
 from .journal import load_es_bars_csv
 
 NY = "America/New_York"
+# (valor de 1 punto en USD, tamaño de 1 tick en puntos). Costo por operación = comisión 4 USD + 1 tick de deslizamiento por lado (ES: 29 USD).
+INSTRUMENTS = {"ES": (50.0, 0.25), "NQ": (20.0, 0.25), "YM": (5.0, 1.0), "RTY": (50.0, 0.10)}
+
+
+def costs(instrument: str = "ES") -> tuple[float, float]:
+    """(costo en puntos, valor del punto) del instrumento."""
+    pv, tick = INSTRUMENTS[instrument]
+    return (4.0 + 2 * tick * pv) / pv, pv
+
 WIN_START, WIN_END = "07:30", "10:30"          # barras de ENTRADA: inicio >= 7:30 y < 10:30
 FLAT = "15:55"
 
@@ -124,49 +133,54 @@ def placebo(df: pd.DataFrame, trades: pd.DataFrame, n_perm: int = 500, seed: int
     return {"placebo_pts_promedio": round(float(means.mean()), 2), "p_valor": round(float((means >= real).mean()), 4)}
 
 
-def stats(tr: pd.DataFrame) -> dict:
+def stats(tr: pd.DataFrame, instrument: str = "ES") -> dict:
     if len(tr) < 5:
         return {"n": len(tr)}
-    net = tr["pts"] - COST_PTS
-    eq = (net * 50).cumsum()
+    cost_pts, pv = costs(instrument)
+    net = tr["pts"] - cost_pts
+    eq = (net * pv).cumsum()
     return {"n": len(tr), "pts_bruto": round(tr["pts"].mean(), 2), "pts_neto": round(net.mean(), 2),
             "t_neto": round(net.mean() / (net.std(ddof=1) / np.sqrt(len(net))), 2) if len(net) > 2 else np.nan,
-            "aciertos_%": round(100 * (net > 0).mean(), 1), "total_usd_neto": round(net.sum() * 50, 0),
+            "aciertos_%": round(100 * (net > 0).mean(), 1), "total_usd_neto": round(net.sum() * pv, 0),
             "peor_caida_usd": round(float((eq - eq.cummax()).min()), 0), "salen_por_regla_%": round(100 * (tr["motivo"] == "regla").mean(), 1),
             "barras_promedio": round(tr["barras"].mean(), 1)}
 
 
-def sensitivity(df: pd.DataFrame) -> pd.DataFrame:
+def sensitivity(df: pd.DataFrame, instrument: str = "ES") -> pd.DataFrame:
     """Cuán amplio es el efecto: variar el umbral de RSI, la banda del VWAP y la condición de MACD. DIAGNÓSTICO, no para elegir la mejor."""
     rows = []
     for rsi_th in (30.0, 33.0, 38.0, 42.0):
         for band_k in (2.0, 1.0):
             for mode in ("A", "B", "N"):
                 tr = run(df, signals(df, mode, rsi_th, band_k))
-                st = stats(tr)
+                st = stats(tr, instrument)
                 pl = placebo(df, tr, n_perm=300)["p_valor"] if len(tr) >= 20 else np.nan
                 rows.append({"rsi<": rsi_th, "banda_sigma": band_k, "macd": mode, **{k: st.get(k) for k in ("n", "pts_neto", "t_neto", "aciertos_%", "total_usd_neto", "peor_caida_usd")}, "p_placebo": pl})
     return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":
-    parts = [load_es_bars_csv(p) for p in sys.argv[1:] if not p.startswith('--')]
+    instrument = sys.argv[sys.argv.index("--instrumento") + 1] if "--instrumento" in sys.argv else "ES"
+    paths = [a for i, a in enumerate(sys.argv[1:], 1) if not a.startswith("--") and sys.argv[i - 1] != "--instrumento"]
+    parts = [load_es_bars_csv(p) for p in paths]
     bars = pd.concat(parts).sort_index()
     bars = bars[~bars.index.duplicated(keep="last")]
     print(f"Barras: {len(bars)}  ({bars.index[0]:%Y-%m-%d} a {bars.index[-1]:%Y-%m-%d})")
     df = add_manuel_indicators(bars)
     pd.set_option("display.width", 220)
     if "--sens" in sys.argv:
-        print(sensitivity(df).to_string(index=False))
+        print(f"Instrumento: {instrument} (costo {costs(instrument)[0]:.2f} pts = {costs(instrument)[0] * costs(instrument)[1]:.0f} USD por operación)")
+        print(sensitivity(df, instrument).to_string(index=False))
         print("\nSi el efecto es real debería verse en muchas filas (no solo en una) y con más operaciones al aflojar las reglas. 'N' = sin MACD.")
         sys.exit(0)
-    for mode, multi, text in (("A", False, "MACD literal (histograma MENOR que la barra anterior)"), ("B", False, "MACD alternativo (histograma MAYOR: se acorta si es rojo)")):
+    for mode, multi, text in (("A", False, "MACD literal (histograma MENOR que la barra anterior)"), ("B", False, "MACD alternativo (histograma MAYOR: se acorta si es rojo)"),
+                              ("N", False, "SIN condición de MACD (RSI, banda y barra alcista)")):
         tr = run(df, signals(df, mode), multi=multi)
         print(f"\n===== Modo {mode} / {'varias' if multi else 'una por día'}: {text} =====")
-        print(pd.Series(stats(tr)).to_string())
+        print(pd.Series(stats(tr, instrument)).to_string())
         if len(tr) >= 20:
             print("Placebo (entrada al azar en la misma ventana, misma duración):", placebo(df, tr))
             yr = pd.to_datetime(tr["date"]).dt.year
             print("\nPor año:")
-            print(pd.DataFrame({int(y): stats(g) for y, g in tr.groupby(yr)}).T.to_string())
-    print("\nSe aprueba solo si el neto es positivo, t > 2, p < 0.025 (0.05 / 2 variantes) contra el placebo y el signo se repite en la mayoría de los años.")
+            print(pd.DataFrame({int(y): stats(g, instrument) for y, g in tr.groupby(yr)}).T.to_string())
+    print("\nSe aprueba solo si el neto es positivo, t > 2, p < 0.017 (0.05 / 3 variantes) contra el placebo y el signo se repite en la mayoría de los años.")
