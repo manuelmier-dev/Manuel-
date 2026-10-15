@@ -19,6 +19,8 @@ Muestra pequeña = no concluye. Una regla "ganadora" entre muchas se vuelve a pr
 | 15 oct 2026 | Estrategia de Manuel: compra de reversión con MACD (histograma), RSI < 33 y precio bajo la banda baja -2σ del VWAP Globex, entrada 7:30-10:30 NY, 1 por día, salida por regla o 15:55 | ES 24 h, 16.8 años | Modo B: 106 operaciones (~6 al año), +4.5 pts netos, t = 1.87, 60% aciertos, +24 mil USD, peor caída -8.1 mil, placebo p = 0.002, 8 de 11 años positivos. Modo A: +2.2 pts, t = 0.80 | Candidata débil: no pasa t > 2; rara y de poco valor en dólares |
 | 15 oct 2026 | Sensibilidad de la anterior (24 combinaciones: RSI 30/33/38/42, banda 1σ/2σ, MACD A/B/ninguno) | ES 16.8 años | Con banda 2σ las 12 combinaciones son positivas (+2.2 a +5.0 pts; sin MACD t = 1.9 a 2.2; n = 168 a 198). Con banda 1σ no hay ventaja (-0.2 a +1.0 pts, t < 1.2). El efecto solo está en el extremo | Efecto estrecho: solo el extremo -2σ; sin MACD rinde igual |
 
+| 15 oct 2026 | (pendiente) Misma entrada, salida nueva de Manuel: barra bajista que cierra bajo la banda alta del VWAP tras tocarla (X2) | ES 16.8 años | por correr | criterio: p < 0.017 contra placebo, t > 2, neto positivo, se repite por años |
+
 ## Conclusiones
 - En 4.4 años de 0DTE y 16.8 años de ES, ninguna regla intradía probada tiene ventaja después de costos.
 - Los niveles de OI/gamma (walls) no aportan información sobre dónde se hace el máximo/mínimo ni mejoran el resultado.

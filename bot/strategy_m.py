@@ -10,9 +10,10 @@ Reglas tal como las dio don Manuel + SUPUESTOS (marcados) para lo que no dijo. T
      - cierre por debajo de la banda baja del VWAP y la barra sube (cierre > apertura)
      - MACD: modo A (literal): histograma MENOR que el de la barra anterior;  modo B (alternativa): histograma MAYOR (se acorta si es rojo)
      Entra a mercado en la APERTURA de la siguiente barra [SUPUESTO: no se puede ver "dentro de la barra" con datos de 5 min]. Una sola operación al día (indicado por don Manuel).
-  SALIDA: al cierre de una barra se cumplen TODAS: banda alta del VWAP subiendo, el precio la cruza hacia abajo (cierre anterior >= banda, cierre actual < banda),
-     MACD en verde (histograma > 0) y menor que el de la barra anterior, RSI bajando y por debajo de 70. Sale a mercado en la apertura de la siguiente barra.
-     [SUPUESTO: salida de seguridad a las 15:55 NY, sin stop de pérdida porque no lo pidió.]
+  SALIDA (cambio de don Manuel, 15-oct; lectura "X2 = rechazo", elegida por él): el precio TOCA la banda alta del VWAP (máximo >= banda) y luego una barra
+     BAJISTA (cierra bajo su apertura) cierra DEBAJO de la banda alta. Sale a mercado en la apertura de la siguiente barra.
+     [SUPUESTO: salida de seguridad a las 15:55 NY, sin stop de pérdida porque no lo pidió.] La salida original (MACD+RSI+VWAP) y la lectura literal X1 se
+     imprimen solo para comparar; el criterio de aprobación usa las 3 variantes de entrada con salida X2 (p < 0.017).
   Costo: 29 USD por operación (0.58 pts). 1 contrato.
 Se compara contra un PLACEBO: la misma cantidad de días con entrada en una barra al azar de la misma ventana y la misma duración de la operación.
 """
