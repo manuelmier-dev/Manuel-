@@ -4,12 +4,12 @@ Uso:  python -m bot.strategy_m <barras1.csv> [<barras2.csv> ...]
 
 Reglas tal como las dio don Manuel + SUPUESTOS (marcados) para lo que no dijo. Todo fijado antes de ver resultados:
   Gráfica de 5 minutos, ES 24 horas. MACD (12, 26, 9) en histograma, RSI (14), VWAP de la sesión Globex (reinicia 18:00 NY) con bandas de +-2 desviaciones.
-  ENTRADA (compra): ventana = desde las 7:30 NY (2 horas antes de la apertura americana) y SIN límite de horario (corrección de don Manuel, 15-oct);
-     [SUPUESTO: la última entrada posible es la barra de las 15:50, porque a las 15:55 se cierra todo]. Al CIERRE de una barra se cumple:
+  ENTRADA (compra): ventana = de 7:30 a 10:30 NY (2 horas antes de la apertura americana y hasta el final de la primera hora; correcciones de don Manuel,
+     15-oct). [SUPUESTO: horas de Nueva York; la última barra con entrada posible es la de 10:25]. UNA sola operación al día. Al CIERRE de una barra se cumple:
      - RSI de la barra anterior < 33 y el RSI sube respecto a esa barra ("después de llegar a menos de 33")        [SUPUESTO: "llegar" = la barra anterior]
      - cierre por debajo de la banda baja del VWAP y la barra sube (cierre > apertura)
      - MACD: modo A (literal): histograma MENOR que el de la barra anterior;  modo B (alternativa): histograma MAYOR (se acorta si es rojo)
-     Entra a mercado en la APERTURA de la siguiente barra [SUPUESTO: no se puede ver "dentro de la barra" con datos de 5 min]. Una entrada por día [SUPUESTO]; se prueba también la variante "varias" (re-entrar al cerrar, una posición a la vez).
+     Entra a mercado en la APERTURA de la siguiente barra [SUPUESTO: no se puede ver "dentro de la barra" con datos de 5 min]. Una sola operación al día (indicado por don Manuel).
   SALIDA: al cierre de una barra se cumplen TODAS: banda alta del VWAP subiendo, el precio la cruza hacia abajo (cierre anterior >= banda, cierre actual < banda),
      MACD en verde (histograma > 0) y menor que el de la barra anterior, RSI bajando y por debajo de 70. Sale a mercado en la apertura de la siguiente barra.
      [SUPUESTO: salida de seguridad a las 15:55 NY, sin stop de pérdida porque no lo pidió.]
@@ -26,7 +26,7 @@ from .indicators import rsi
 from .journal import load_es_bars_csv
 
 NY = "America/New_York"
-WIN_START, WIN_END = "07:30", "15:55"          # barras de ENTRADA: inicio >= 7:30 y < 15:55 (sin límite de horario hasta el cierre)
+WIN_START, WIN_END = "07:30", "10:30"          # barras de ENTRADA: inicio >= 7:30 y < 10:30
 FLAT = "15:55"
 
 
@@ -141,8 +141,7 @@ if __name__ == "__main__":
     print(f"Barras: {len(bars)}  ({bars.index[0]:%Y-%m-%d} a {bars.index[-1]:%Y-%m-%d})")
     df = add_manuel_indicators(bars)
     pd.set_option("display.width", 220)
-    for mode, multi, text in (("A", False, "MACD literal (histograma MENOR), una entrada por día"), ("B", False, "MACD alternativo (histograma MAYOR), una entrada por día"),
-                              ("A", True, "MACD literal, varias entradas por día (una posición a la vez)"), ("B", True, "MACD alternativo, varias entradas por día")):
+    for mode, multi, text in (("A", False, "MACD literal (histograma MENOR que la barra anterior)"), ("B", False, "MACD alternativo (histograma MAYOR: se acorta si es rojo)")):
         tr = run(df, signals(df, mode), multi=multi)
         print(f"\n===== Modo {mode} / {'varias' if multi else 'una por día'}: {text} =====")
         print(pd.Series(stats(tr)).to_string())
@@ -151,4 +150,4 @@ if __name__ == "__main__":
             yr = pd.to_datetime(tr["date"]).dt.year
             print("\nPor año:")
             print(pd.DataFrame({int(y): stats(g) for y, g in tr.groupby(yr)}).T.to_string())
-    print("\nSe aprueba solo si el neto es positivo, t > 2, p < 0.012 (0.05 / 4 variantes) contra el placebo y el signo se repite en la mayoría de los años.")
+    print("\nSe aprueba solo si el neto es positivo, t > 2, p < 0.025 (0.05 / 2 variantes) contra el placebo y el signo se repite en la mayoría de los años.")

@@ -32,18 +32,20 @@ class TestStrategyM(unittest.TestCase):
         self.assertIsNone(second_day)
         self.assertAlmostEqual(first["vwap"], (first["high"] + first["low"] + first["close"]) / 3)      # la primera barra de la sesión es su propio VWAP
 
-    def test_window_starts_at_0730_with_no_end_and_one_per_day_or_many(self):
+    def test_window_is_0730_to_1030_and_one_per_day(self):
         df = add_manuel_indicators(one_day_bars())
         sig = pd.DataFrame({"entry": False, "exit": False}, index=df.index)
         for hhmm in ("07:00", "07:35", "08:10", "13:40"):                      # una señal antes de las 7:30, y tres después (la última ya de tarde)
             sig.loc[pd.Timestamp(f"2024-03-05 {hhmm}", tz=NY), "entry"] = True
         self.assertEqual(len(run(df, sig, multi=False)), 1)                    # una por día
-        sig2 = sig.copy()
-        sig2.loc[pd.Timestamp("2024-03-05 07:45", tz=NY), "exit"] = True
-        sig2.loc[pd.Timestamp("2024-03-05 08:30", tz=NY), "exit"] = True
-        many = run(df, sig2, multi=True)
-        self.assertEqual(len(many), 3)                                         # entra 7:40 y sale 7:50; entra 8:15 y sale 8:35; entra 13:45 y cierra a las 15:55
-        self.assertGreaterEqual(many.iloc[-1]["entry_time"], pd.Timestamp("2024-03-05 13:00", tz=NY))   # sin límite de horario
+        late = pd.DataFrame({"entry": False, "exit": False}, index=df.index)
+        late.loc[pd.Timestamp("2024-03-05 10:25", tz=NY), "entry"] = True       # entraría a las 10:30: ya fuera de la ventana
+        self.assertEqual(len(run(df, late)), 0)
+        edge = late.copy()
+        edge.loc[pd.Timestamp("2024-03-05 10:25", tz=NY), "entry"] = False
+        edge.loc[pd.Timestamp("2024-03-05 10:20", tz=NY), "entry"] = True       # entra a las 10:25: dentro
+        self.assertEqual(len(run(df, edge)), 1)
+        self.assertEqual(len(run(df, sig, multi=False, win_start="07:30", win_end="15:55")), 1)
         tr = run(df, sig)
         self.assertEqual(len(tr), 1)                                           # una por día
         self.assertEqual(tr.iloc[0]["entry_time"], pd.Timestamp("2024-03-05 07:40", tz=NY))   # la señal de 7:35 entra a la apertura de las 7:40
