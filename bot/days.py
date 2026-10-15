@@ -19,6 +19,7 @@ import pandas as pd
 NY = "America/New_York"
 CARRY_WINDOW = 5
 CARRY_RANGE = (-30.0, 150.0)
+LIVE_BASIS_JUMP = 100.0           # días de Theta: salto máximo de la base contra la mediana de los 5 días anteriores (los ajustes por vencimiento son de ~30-70 pts)
 
 WALL_MODES = {
     "oi": ("call_wall_oi", "put_wall_oi"),                  # mayor Open Interest de todo el archivo
@@ -61,11 +62,21 @@ def build_days(summary: pd.DataFrame, es_bars: pd.DataFrame, snapshot: time = ti
             continue
         es_prev, es_now = prev[1], float(done["close"].iloc[-1])
         live = r.get("fuente") == "theta"                 # spot de las 9:20 en vivo (Theta) o del cierre previo (cadenas de TradeStation)
-        bases.append((es_now if live else es_prev) - float(r["spot"]))
-        carry = float(np.median(bases[-CARRY_WINDOW:]))
-        if not CARRY_RANGE[0] <= carry <= CARRY_RANGE[1]:
-            skipped.append(f"{d.date()}: base ES-SPX de {carry:.0f} pts fuera de lo normal (¿precios ajustados o zona horaria?)")
-            continue
+        if live:
+            # Base del MISMO día (ES a las 9:20 - spot a las 9:20). Sirve también con ES "continuo ajustado" (la API de TradeStation
+            # lo entrega así: en 2022 la base sale en ~890 pts por los ajustes de cada vencimiento), porque dentro del día es constante.
+            carry = es_now - float(r["spot"])
+            prior = bases[-CARRY_WINDOW:]
+            bases.append(carry)
+            if prior and abs(carry - float(np.median(prior))) > LIVE_BASIS_JUMP:
+                skipped.append(f"{d.date()}: la base ES-SPX saltó a {carry:.0f} pts (mediana reciente {np.median(prior):.0f}); dato dudoso")
+                continue
+        else:
+            bases.append(es_prev - float(r["spot"]))
+            carry = float(np.median(bases[-CARRY_WINDOW:]))
+            if not CARRY_RANGE[0] <= carry <= CARRY_RANGE[1]:
+                skipped.append(f"{d.date()}: base ES-SPX de {carry:.0f} pts fuera de lo normal (¿precios ajustados o zona horaria?)")
+                continue
         center = float(r["spot"]) if live else es_now - carry   # precio real de las 9:20 en coordenadas SPX
         em = float(r["em_tradestation"] if pd.notna(r["em_tradestation"]) else r["em_proxy"])
         if wall_mode == "oi_1em" and isinstance(r.get("_table"), pd.DataFrame):

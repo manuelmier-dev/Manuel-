@@ -55,6 +55,23 @@ class TestStaleSpot(unittest.TestCase):
         self.assertEqual((r["center_spx"], r["basis"]), (5030.0, 50.0))
         self.assertEqual(r["gap_nocturno"], 30.0)
 
+    def test_theta_day_accepts_adjusted_es_with_huge_base_and_rejects_a_wild_jump(self):
+        t = table({5040.0: 4000}, {5000.0: 5000})
+        days = []
+        for i, base in enumerate([888.0, 889.0, 890.0, 400.0]):             # ES "continuo ajustado": base ~890; el último día es un salto absurdo
+            day = f"2024-01-0{2 + i}"
+            r0 = row(day, 5030.0, 40.0, t)
+            r0["fuente"] = "theta"
+            days.append((r0, bars_for(day, 5900.0, 5030.0 + base)))
+        summary = pd.DataFrame([a for a, _ in days])
+        bars = pd.concat([b for _, b in days]).sort_index()
+        bars = bars[~bars.index.duplicated(keep="last")]
+        out, skipped = build_days(summary, bars)
+        self.assertEqual(len(out), 3)
+        self.assertAlmostEqual(out.iloc[0]["basis"], 888.0)
+        self.assertEqual(len(skipped), 1)
+        self.assertIn("saltó", skipped[0])
+
     def test_global_oi_mode_keeps_file_walls(self):
         t = table({}, {})
         days, _ = build_days(pd.DataFrame([row("2024-01-03", 5000.0, 40.0, t)]), bars_for("2024-01-03", 5050.0, 5080.0), wall_mode="oi")
