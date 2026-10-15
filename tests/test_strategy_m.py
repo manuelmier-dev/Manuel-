@@ -66,6 +66,13 @@ class TestStrategyM(unittest.TestCase):
         self.assertFalse((a["entry"] & b["entry"]).any())                       # A y B no pueden cumplirse a la vez
         self.assertEqual(stats(pd.DataFrame({"pts": [1.0], "motivo": ["hora"], "barras": [3]}))["n"], 1)
 
+    def test_no_macd_mode_is_a_superset_and_thresholds_can_loosen(self):
+        df = add_manuel_indicators(one_day_bars())
+        a, b, n = signals(df, "A"), signals(df, "B"), signals(df, "N")
+        self.assertTrue(((a["entry"] | b["entry"]) <= n["entry"]).all())          # sin MACD se cumplen al menos las de A y B
+        self.assertGreaterEqual(signals(df, "N", rsi_th=42.0)["entry"].sum(), n["entry"].sum())
+        self.assertIn("vwap_sd", df.columns)
+
     def test_placebo_returns_a_probability(self):
         df = add_manuel_indicators(one_day_bars())
         trades = pd.DataFrame({"date": [pd.Timestamp("2024-03-05").date()], "barras": [10], "pts": [2.0]})

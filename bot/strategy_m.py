@@ -43,15 +43,17 @@ def add_manuel_indicators(bars: pd.DataFrame) -> pd.DataFrame:
     cv = v.groupby(g).cumsum().replace(0, np.nan)
     vwap = (tp * v).groupby(g).cumsum() / cv
     sd = np.sqrt((((tp**2) * v).groupby(g).cumsum() / cv - vwap**2).clip(lower=0))
-    df["vwap"], df["vwap_up"], df["vwap_dn"] = vwap, vwap + 2 * sd, vwap - 2 * sd
+    df["vwap"], df["vwap_up"], df["vwap_dn"], df["vwap_sd"] = vwap, vwap + 2 * sd, vwap - 2 * sd, sd
     return df
 
 
-def signals(df: pd.DataFrame, mode: str = "A") -> pd.DataFrame:
+def signals(df: pd.DataFrame, mode: str = "A", rsi_th: float = 33.0, band_k: float = 2.0) -> pd.DataFrame:
+    """mode: "A" (histograma menor), "B" (histograma mayor) o "N" (sin condición de MACD). rsi_th y band_k solo se cambian en la tabla de sensibilidad."""
     h, hp = df["hist"], df["hist"].shift(1)
     r, rp = df["rsi"], df["rsi"].shift(1)
-    macd_ok = (h < hp) if mode == "A" else (h > hp)
-    entry = (rp < 33) & (r > rp) & (df["close"] < df["vwap_dn"]) & (df["close"] > df["open"]) & macd_ok
+    macd_ok = (h < hp) if mode == "A" else (h > hp) if mode == "B" else pd.Series(True, index=df.index)
+    below = df["close"] < (df["vwap"] - band_k * df["vwap_sd"]) if band_k != 2.0 else df["close"] < df["vwap_dn"]
+    entry = (rp < rsi_th) & (r > rp) & below & (df["close"] > df["open"]) & macd_ok
     up, upp, cp = df["vwap_up"], df["vwap_up"].shift(1), df["close"].shift(1)
     exit_ = (up > upp) & (cp >= upp) & (df["close"] < up) & (h > 0) & (h < hp) & (r < rp) & (r < 70)
     return pd.DataFrame({"entry": entry.fillna(False), "exit": exit_.fillna(False)})
@@ -134,13 +136,30 @@ def stats(tr: pd.DataFrame) -> dict:
             "barras_promedio": round(tr["barras"].mean(), 1)}
 
 
+def sensitivity(df: pd.DataFrame) -> pd.DataFrame:
+    """Cuán amplio es el efecto: variar el umbral de RSI, la banda del VWAP y la condición de MACD. DIAGNÓSTICO, no para elegir la mejor."""
+    rows = []
+    for rsi_th in (30.0, 33.0, 38.0, 42.0):
+        for band_k in (2.0, 1.0):
+            for mode in ("A", "B", "N"):
+                tr = run(df, signals(df, mode, rsi_th, band_k))
+                st = stats(tr)
+                pl = placebo(df, tr, n_perm=300)["p_valor"] if len(tr) >= 20 else np.nan
+                rows.append({"rsi<": rsi_th, "banda_sigma": band_k, "macd": mode, **{k: st.get(k) for k in ("n", "pts_neto", "t_neto", "aciertos_%", "total_usd_neto", "peor_caida_usd")}, "p_placebo": pl})
+    return pd.DataFrame(rows)
+
+
 if __name__ == "__main__":
-    parts = [load_es_bars_csv(p) for p in sys.argv[1:]]
+    parts = [load_es_bars_csv(p) for p in sys.argv[1:] if not p.startswith('--')]
     bars = pd.concat(parts).sort_index()
     bars = bars[~bars.index.duplicated(keep="last")]
     print(f"Barras: {len(bars)}  ({bars.index[0]:%Y-%m-%d} a {bars.index[-1]:%Y-%m-%d})")
     df = add_manuel_indicators(bars)
     pd.set_option("display.width", 220)
+    if "--sens" in sys.argv:
+        print(sensitivity(df).to_string(index=False))
+        print("\nSi el efecto es real debería verse en muchas filas (no solo en una) y con más operaciones al aflojar las reglas. 'N' = sin MACD.")
+        sys.exit(0)
     for mode, multi, text in (("A", False, "MACD literal (histograma MENOR que la barra anterior)"), ("B", False, "MACD alternativo (histograma MAYOR: se acorta si es rojo)")):
         tr = run(df, signals(df, mode), multi=multi)
         print(f"\n===== Modo {mode} / {'varias' if multi else 'una por día'}: {text} =====")
