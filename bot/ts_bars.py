@@ -2,7 +2,7 @@
 
 Uso (en el servidor donde está ts_tokens.json; el token se LEE del archivo, nunca se imprime ni se pide):
   python -m bot.ts_bars probe    <ts_tokens.json> [@ES]                                  # 20 barras de prueba (datos de mercado)
-  python -m bot.ts_bars download <ts_tokens.json> <salida.csv> <desde> <hasta> [@ES] [<ES_5min.csv de referencia>]
+  python -m bot.ts_bars download <ts_tokens.json> <salida.csv> <desde> <hasta> [@ES] [<ES_5min.csv de referencia> | close | open]
 
 *** NO PROBADO contra la API real: Claude no tiene acceso a TradeStation. Los nombres de parámetros salen de la documentación pública
 *** (barcharts de la API v3). `probe` guarda la respuesta real para ajustar. Con una referencia (el ES_5min.csv bueno) se comprueba si la
@@ -145,7 +145,10 @@ if __name__ == "__main__":
         bars = download_bars(sym, start, end, token)
         print(f"Barras recibidas: {len(bars)}  ({bars.index.min()} -> {bars.index.max()})")
         stamp = "open"
-        if ref:
+        if ref in ("close", "open"):                  # para tramos de años que no se traslapan con la referencia: ya se comprobó que la API da la hora de CIERRE
+            stamp = ref
+            print(f"Se usa la hora de {'CIERRE' if ref == 'close' else 'INICIO'} de la barra (indicada a mano).")
+        elif ref:
             from .journal import load_es_bars_csv
             stamp = detect_stamp(bars, load_es_bars_csv(ref))
             print(f"La hora de la API es la de {'INICIO' if stamp == 'open' else 'CIERRE'} de la barra (comprobado contra {Path(ref).name})")
