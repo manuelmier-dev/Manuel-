@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from bot.ts_orders import SIM_BASE, far_limit_price, probar_ciclo, SafetyError, assert_sim_account, es_front_symbol, list_accounts, order_body, third_friday
+from bot.ts_orders import net_qty, probar_ciclo_mercado, SIM_BASE, far_limit_price, probar_ciclo, SafetyError, assert_sim_account, es_front_symbol, list_accounts, order_body, third_friday
 
 
 class TestTsOrders(unittest.TestCase):
@@ -61,6 +61,71 @@ class TestTsOrders(unittest.TestCase):
         self.assertEqual(list_accounts("t", fetch=lambda m, p, t: (200, {"Accounts": [{"AccountID": "SIM1"}]}))[0]["AccountID"], "SIM1")
         with self.assertRaises(RuntimeError):
             list_accounts("t", fetch=lambda m, p, t: (401, {"Message": "x"}))
+
+
+class FakeBroker:
+    """Simulador mínimo del broker: mercado se llena al instante, los stops/OCO quedan vivos, se pueden cancelar."""
+
+    def __init__(self, fail_oco=False, price=7700.0):
+        self.orders, self.pos, self.n, self.fail_oco, self.price = {}, 0, 100, fail_oco, price
+        self.log = []
+
+    def __call__(self, method, path, token, body=None):
+        self.log.append((method, path))
+        if method == "POST" and path == "/orderexecution/orders":
+            self.n += 1
+            if body["OrderType"] == "Market":
+                self.pos += 1 if body["TradeAction"] == "BUY" else -1
+                self.orders[str(self.n)] = {"OrderID": str(self.n), "Status": "FLL", "FilledPrice": str(self.price)}
+            else:
+                self.orders[str(self.n)] = {"OrderID": str(self.n), "Status": "OPN"}
+            return 200, {"Orders": [{"OrderID": str(self.n)}]}
+        if method == "POST" and path == "/orderexecution/ordergroups":
+            if self.fail_oco:
+                return 400, {"Message": "grupo inválido"}
+            ids = []
+            for _ in body["Orders"]:
+                self.n += 1
+                self.orders[str(self.n)] = {"OrderID": str(self.n), "Status": "OPN"}
+                ids.append({"OrderID": str(self.n)})
+            return 200, {"Orders": ids}
+        if method == "DELETE":
+            oid = path.rsplit("/", 1)[1]
+            self.orders[oid]["Status"] = "OUT"
+            return 200, {"OrderID": oid}
+        if path.endswith("/orders"):
+            return 200, {"Orders": list(self.orders.values())}
+        if path.endswith("/positions"):
+            return 200, {"Positions": [{"Symbol": "ESZ26", "Quantity": str(abs(self.pos)), "LongShort": "Long" if self.pos > 0 else "Short"}] if self.pos else []}
+        return 404, {}
+
+
+class TestMarketCycle(unittest.TestCase):
+    def test_full_cycle_leaves_no_orders_and_no_position(self):
+        b = FakeBroker()
+        log = probar_ciclo_mercado("t", "SIM1", date(2026, 10, 15), True, fetch=b)
+        self.assertEqual(b.pos, 0)
+        self.assertTrue(all(o["Status"] in ("FLL", "OUT") for o in b.orders.values()))
+        self.assertIn("posición final: 0", log[-1])
+
+    def test_if_oco_fails_it_still_flattens(self):
+        b = FakeBroker(fail_oco=True)
+        with self.assertRaises(RuntimeError):
+            probar_ciclo_mercado("t", "SIM1", date(2026, 10, 15), True, fetch=b)
+        self.assertEqual(b.pos, 0)                                     # limpió antes de avisar
+
+    def test_refuses_if_position_already_open_and_without_enviar_does_nothing(self):
+        b = FakeBroker()
+        b.pos = 1
+        with self.assertRaises(SafetyError):
+            probar_ciclo_mercado("t", "SIM1", date(2026, 10, 15), True, fetch=b)
+        b2 = FakeBroker()
+        probar_ciclo_mercado("t", "SIM1", date(2026, 10, 15), False, fetch=b2)
+        self.assertEqual(b2.log, [])
+
+    def test_net_qty_signs(self):
+        self.assertEqual(net_qty([{"Symbol": "ESZ26", "Quantity": "1", "LongShort": "Short"}], "ESZ26"), -1)
+        self.assertEqual(net_qty([], "ESZ26"), 0)
 
 
 if __name__ == "__main__":

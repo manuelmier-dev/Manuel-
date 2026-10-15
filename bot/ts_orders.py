@@ -12,6 +12,7 @@ Uso (en el servidor; el token se lee del archivo, no se imprime):
   python -m bot.ts_orders cuentas   <ts_tokens.json>
   python -m bot.ts_orders confirmar <ts_tokens.json> <cuenta SIM>   # pide a la API VALIDAR una compra lejana de 1 ES; no envía la orden
   python -m bot.ts_orders prueba    <ts_tokens.json> <cuenta SIM> [--enviar]   # envía esa compra lejana al simulador y la cancela
+  python -m bot.ts_orders ciclo     <ts_tokens.json> <cuenta SIM> [--enviar]   # compra a mercado, OCO lejano, cancela y cierra (mercado abierto)
 """
 import json
 import sys
@@ -119,6 +120,106 @@ def order_status(token: str, account: str, order_id: str, fetch=call) -> dict:
     return next((o for o in payload.get("Orders", []) if str(o.get("OrderID")) == str(order_id)), {})
 
 
+FILLED = {"FLL"}
+DEAD = {"REJ", "OUT", "CAN", "EXP", "UCN", "TSC"}
+
+
+def get_positions(token: str, account: str, fetch=call) -> list[dict]:
+    assert_sim_account(account)
+    status, payload = fetch("GET", f"/brokerage/accounts/{account}/positions", token)
+    if status != 200:
+        raise RuntimeError(f"No pude leer las posiciones (HTTP {status}): {str(payload)[:300]}")
+    return payload.get("Positions", [])
+
+
+def net_qty(positions: list[dict], symbol: str) -> int:
+    """Contratos netos del símbolo: + largo, - corto."""
+    total = 0
+    for p in positions:
+        if p.get("Symbol") == symbol:
+            q = int(float(p.get("Quantity", 0)))
+            total += q if str(p.get("LongShort", "Long")).lower().startswith("l") else -q
+    return total
+
+
+def fill_price(order: dict):
+    if order.get("FilledPrice") not in (None, "", "0"):
+        return float(order["FilledPrice"])
+    legs = order.get("Legs") or []
+    return float(legs[0]["ExecutionPrice"]) if legs and legs[0].get("ExecutionPrice") else None
+
+
+def wait_fill(token: str, account: str, order_id: str, fetch=call, sleep=lambda s: None, tries: int = 15) -> float:
+    """Espera a que la orden se llene y devuelve el precio de llenado. Si muere o no se llena a tiempo, avisa."""
+    for _ in range(tries):
+        o = order_status(token, account, order_id, fetch)
+        if o.get("Status") in FILLED:
+            px = fill_price(o)
+            if px is None:
+                raise RuntimeError(f"La orden {order_id} se llenó pero no encuentro el precio: {str(o)[:300]}")
+            return px
+        if o.get("Status") in DEAD:
+            raise RuntimeError(f"La orden {order_id} no se llenó: {o.get('Status')} {o.get('StatusDescription')}")
+        sleep(1)
+    raise RuntimeError(f"La orden {order_id} sigue sin llenarse después de {tries} intentos")
+
+
+def place_oco(token: str, account: str, symbol: str, exit_side: str, stop_price: float, target_price: float, fetch=call) -> tuple[str, str]:
+    """Dos órdenes de salida ligadas (si una se ejecuta, se cancela la otra): STOP y LIMIT de 1 contrato. Devuelve (id_stop, id_objetivo)."""
+    stop = order_body(account, symbol, exit_side, "StopMarket", stop=stop_price)
+    tgt = order_body(account, symbol, exit_side, "Limit", limit=target_price)
+    status, payload = fetch("POST", "/orderexecution/ordergroups", token, {"Type": "OCO", "Orders": [stop, tgt]})
+    orders = payload.get("Orders") or []
+    if status != 200 or len(orders) != 2 or not all(o.get("OrderID") for o in orders):
+        raise RuntimeError(f"El simulador no aceptó el grupo OCO (HTTP {status}): {str(payload)[:400]}")
+    return str(orders[0]["OrderID"]), str(orders[1]["OrderID"])
+
+
+def flatten(token: str, account: str, symbol: str, fetch=call, sleep=lambda s: None) -> int:
+    """Cierra a mercado lo que haya abierto en ese símbolo. Devuelve los contratos que había."""
+    q = net_qty(get_positions(token, account, fetch), symbol)
+    if q == 0:
+        return 0
+    if abs(q) > MAX_QTY:
+        raise SafetyError(f"Hay {q} contratos abiertos (el máximo es {MAX_QTY}); no opero más y aviso.")
+    oid = place_order(token, order_body(account, symbol, "SELL" if q > 0 else "BUY", "Market"), fetch)
+    wait_fill(token, account, oid, fetch, sleep)
+    return q
+
+
+def probar_ciclo_mercado(token: str, account: str, today: date, send: bool, fetch=call, sleep=lambda s: None, dist: float = 200.0) -> list[str]:
+    """Etapa 5a, SOLO simulador: compra 1 ES a mercado, pone STOP y objetivo OCO muy lejos (+-200 pts), los cancela y cierra a mercado.
+    Prueba la mecánica completa con llenados reales del simulador. Si algo falla, limpia (cancela y cierra) antes de avisar."""
+    account = assert_sim_account(account)
+    symbol = es_front_symbol(today)
+    log = [f"Ciclo completo en el simulador: comprar 1 {symbol} a mercado, OCO a +-{dist:.0f} pts, cancelar, cerrar."]
+    if not send:
+        return log + ["NO se envía nada (falta --enviar)."]
+    if net_qty(get_positions(token, account, fetch), symbol) != 0:
+        raise SafetyError("Ya hay una posición abierta en esa cuenta; no empiezo la prueba.")
+    ids: list[str] = []
+    try:
+        oid = place_order(token, order_body(account, symbol, "BUY", "Market"), fetch)
+        px = wait_fill(token, account, oid, fetch, sleep)
+        log.append(f"Compra llenada a {px}")
+        log.append(f"Posición neta: {net_qty(get_positions(token, account, fetch), symbol)}")
+        sid, tid = place_oco(token, account, symbol, "SELL", px - dist, px + dist, fetch)
+        ids = [sid, tid]
+        log.append(f"OCO enviado: stop {px - dist:.2f} (id {sid}) / objetivo {px + dist:.2f} (id {tid})")
+        sleep(2)
+        log.append("Estados: " + ", ".join(f"{i}={order_status(token, account, i, fetch).get('Status')}" for i in ids))
+    finally:
+        for i in ids:
+            try:
+                cancel_order(token, i, fetch)
+            except RuntimeError as e:
+                log.append(f"(al cancelar {i}: {e})")
+        sleep(2)
+        closed = flatten(token, account, symbol, fetch, sleep)
+        log.append(f"Cierre a mercado de {closed} contrato(s); posición final: {net_qty(get_positions(token, account, fetch), symbol)}")
+    return log
+
+
 def probar_ciclo(token: str, account: str, last: float, today: date, send: bool, fetch=call, sleep=lambda s: None) -> list[str]:
     """Etapa 3: enviar una compra muy lejana (no se ejecuta), verla viva, cancelarla y comprobar que quedó cancelada. Solo con send=True."""
     body = order_body(assert_sim_account(account), es_front_symbol(today), "BUY", "Limit", limit=far_limit_price(last))
@@ -182,3 +283,7 @@ if __name__ == "__main__":
             print(f"No pude leer el precio actual de ES (HTTP {st}).")
             sys.exit(1)
         print("\n".join(probar_ciclo(token, account, float(bars[-1]["Close"]), date.today(), "--enviar" in sys.argv, sleep=time.sleep)))
+    elif cmd == "ciclo":
+        import time
+        account = assert_sim_account(sys.argv[3])
+        print("\n".join(probar_ciclo_mercado(token, account, date.today(), "--enviar" in sys.argv, sleep=time.sleep)))
