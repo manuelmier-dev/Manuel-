@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from bot.ts_orders import SIM_BASE, far_limit_price, SafetyError, assert_sim_account, es_front_symbol, list_accounts, order_body, third_friday
+from bot.ts_orders import SIM_BASE, far_limit_price, probar_ciclo, SafetyError, assert_sim_account, es_front_symbol, list_accounts, order_body, third_friday
 
 
 class TestTsOrders(unittest.TestCase):
@@ -31,6 +31,31 @@ class TestTsOrders(unittest.TestCase):
         p = far_limit_price(7743.13)
         self.assertEqual(p, 7443.25)
         self.assertEqual(p % 0.25, 0.0)
+
+    def probar_ciclo_without_enviar_sends_nothing_and_with_enviar_places_checks_and_cancels(self):
+        calls = []
+
+        def fake(method, path, token, body=None):
+            calls.append((method, path))
+            if method == "POST":
+                return 200, {"Orders": [{"OrderID": "99", "Message": "Sent order"}]}
+            if method == "DELETE":
+                return 200, {"OrderID": "99", "Message": "Sent cancel"}
+            state = "ACK" if len([c for c in calls if c[0] == "GET"]) == 1 else "CAN"
+            return 200, {"Orders": [{"OrderID": "99", "Status": state, "StatusDescription": state}]}
+        log = probar_ciclo("t", "SIM1", 7700.0, date(2026, 10, 15), send=False, fetch=fake)
+        self.assertEqual(calls, [])
+        self.assertIn("NO se envía", log[-1])
+        log = probar_ciclo("t", "SIM1", 7700.0, date(2026, 10, 15), send=True, fetch=fake)
+        self.assertEqual([c[0] for c in calls], ["POST", "GET", "DELETE", "GET"])
+        self.assertIn("Estado final: CAN", log[-1])
+        with self.assertRaises(SafetyError):
+            probar_ciclo("t", "123456", 7700.0, date(2026, 10, 15), send=True, fetch=fake)      # cuenta real: nunca
+
+    def test_rejected_order_raises(self):
+        from bot.ts_orders import place_order
+        with self.assertRaises(RuntimeError):
+            place_order("t", order_body("SIM1", "ESZ26", "BUY", "Limit", limit=7000.0), fetch=lambda *a, **k: (400, {"Message": "no"}))
 
     def test_list_accounts_reports_errors(self):
         self.assertEqual(list_accounts("t", fetch=lambda m, p, t: (200, {"Accounts": [{"AccountID": "SIM1"}]}))[0]["AccountID"], "SIM1")

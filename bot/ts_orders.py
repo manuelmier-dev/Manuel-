@@ -11,6 +11,7 @@ Seguridad (se comprueba en el código y en las pruebas):
 Uso (en el servidor; el token se lee del archivo, no se imprime):
   python -m bot.ts_orders cuentas   <ts_tokens.json>
   python -m bot.ts_orders confirmar <ts_tokens.json> <cuenta SIM>   # pide a la API VALIDAR una compra lejana de 1 ES; no envía la orden
+  python -m bot.ts_orders prueba    <ts_tokens.json> <cuenta SIM> [--enviar]   # envía esa compra lejana al simulador y la cancela
 """
 import json
 import sys
@@ -93,6 +94,49 @@ def list_accounts(token: str, fetch=call) -> list[dict]:
     return payload.get("Accounts", [])
 
 
+def place_order(token: str, body: dict, fetch=call) -> str:
+    """Envía UNA orden al simulador y devuelve su OrderID. (El cuerpo ya pasó por order_body: SIM, 1 contrato.)"""
+    assert_sim_account(body["AccountID"])
+    status, payload = fetch("POST", "/orderexecution/orders", token, body)
+    orders = payload.get("Orders") or []
+    if status != 200 or not orders or not orders[0].get("OrderID"):
+        raise RuntimeError(f"El simulador no aceptó la orden (HTTP {status}): {str(payload)[:400]}")
+    return str(orders[0]["OrderID"])
+
+
+def cancel_order(token: str, order_id: str, fetch=call) -> dict:
+    status, payload = fetch("DELETE", f"/orderexecution/orders/{order_id}", token)
+    if status != 200:
+        raise RuntimeError(f"No se pudo cancelar {order_id} (HTTP {status}): {str(payload)[:300]}")
+    return payload
+
+
+def order_status(token: str, account: str, order_id: str, fetch=call) -> dict:
+    assert_sim_account(account)
+    status, payload = fetch("GET", f"/brokerage/accounts/{account}/orders", token)
+    if status != 200:
+        raise RuntimeError(f"No pude leer las órdenes (HTTP {status}): {str(payload)[:300]}")
+    return next((o for o in payload.get("Orders", []) if str(o.get("OrderID")) == str(order_id)), {})
+
+
+def probar_ciclo(token: str, account: str, last: float, today: date, send: bool, fetch=call, sleep=lambda s: None) -> list[str]:
+    """Etapa 3: enviar una compra muy lejana (no se ejecuta), verla viva, cancelarla y comprobar que quedó cancelada. Solo con send=True."""
+    body = order_body(assert_sim_account(account), es_front_symbol(today), "BUY", "Limit", limit=far_limit_price(last))
+    log = [f"Orden de prueba: {body['TradeAction']} 1 {body['Symbol']} límite {body['LimitPrice']} (ES está en {last})"]
+    if not send:
+        return log + ["NO se envía nada (falta --enviar)."]
+    oid = place_order(token, body, fetch)
+    log.append(f"Enviada. OrderID {oid}")
+    sleep(2)
+    st = order_status(token, account, oid, fetch)
+    log.append(f"Estado tras enviarla: {st.get('Status')} - {st.get('StatusDescription')}")
+    log.append(f"Cancelación: {cancel_order(token, oid, fetch)}")
+    sleep(2)
+    st = order_status(token, account, oid, fetch)
+    log.append(f"Estado final: {st.get('Status')} - {st.get('StatusDescription')}")
+    return log
+
+
 if __name__ == "__main__":
     from .ts_bars import read_token
     cmd = sys.argv[1]
@@ -124,3 +168,17 @@ if __name__ == "__main__":
         print(f"Precio de ES ahora: {last}.  Pido VALIDAR (no enviar): {body}")
         status, answer = call("POST", "/orderexecution/orderconfirm", token, body)
         print(f"HTTP {status}: {json.dumps(answer)[:600]}")
+    elif cmd == "prueba":
+        import time
+        from datetime import datetime, timezone
+
+        import pandas as pd
+
+        from .ts_bars import build_url, fetch_json
+        account = assert_sim_account(sys.argv[3])
+        st, payload = fetch_json(build_url("@ES", pd.Timestamp(datetime.now(timezone.utc)), barsback=1), token)
+        bars = payload.get("Bars") or []
+        if st != 200 or not bars:
+            print(f"No pude leer el precio actual de ES (HTTP {st}).")
+            sys.exit(1)
+        print("\n".join(probar_ciclo(token, account, float(bars[-1]["Close"]), date.today(), "--enviar" in sys.argv, sleep=time.sleep)))
