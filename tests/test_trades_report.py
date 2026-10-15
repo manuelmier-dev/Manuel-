@@ -12,7 +12,7 @@ class TestTradesReport(unittest.TestCase):
         self.assertEqual(r.loc[2023, "operaciones"], 2)
         self.assertEqual(r.loc[2023, "total_usd"], 50.0)
         self.assertEqual(r.loc[2023, "total_antes_de_costos"], 50.0 + 2 * 29)          # 4 de comisión + 25 de deslizamiento por operación
-        self.assertEqual(len(by_period(t, "quarter")), 3)
+        self.assertEqual(len(by_period(t, "quarter")), 2)          # 2023Q1 y 2024Q1
 
 
 if __name__ == "__main__":
