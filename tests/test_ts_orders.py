@@ -32,7 +32,7 @@ class TestTsOrders(unittest.TestCase):
         self.assertEqual(p, 7443.25)
         self.assertEqual(p % 0.25, 0.0)
 
-    def probar_ciclo_without_enviar_sends_nothing_and_with_enviar_places_checks_and_cancels(self):
+    def test_ciclo_without_enviar_sends_nothing_and_with_enviar_places_checks_and_cancels(self):
         calls = []
 
         def fake(method, path, token, body=None):
