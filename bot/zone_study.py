@@ -41,7 +41,7 @@ def level_table(summary: pd.DataFrame, days: pd.DataFrame) -> pd.DataFrame:
     center = d["center_spx"] + b
     return pd.DataFrame({
         "em": d["em_pts"], "center": center, "gex_bn": d["gex_bn"],
-        "call_oi_1em": d["call_wall"], "put_oi_1em": d["put_wall"],
+        "call_oi_1em": d["call_wall"] + b, "put_oi_1em": d["put_wall"] + b,      # days.call_wall/put_wall vienen en coordenadas SPX: se pasan a ES
         "call_gex": d["call_wall_gex"] + b, "put_gex": d["put_wall_gex"] + b,
         "call_oi_global": d["call_wall_oi"] + b, "put_oi_global": d["put_wall_oi"] + b,
         "mas_1_em": center + d["em_pts"], "menos_1_em": center - d["em_pts"],
@@ -57,13 +57,15 @@ def location_stats(ext: pd.Series, level: pd.Series, center: pd.Series, em: pd.S
     d_real = ((k["x"] - k["l"]).abs() / k["e"]).to_numpy()
     off = ((k["l"] - k["c"]) / k["e"]).to_numpy()                  # posición relativa del nivel respecto al precio, en EM
     rng = np.random.default_rng(seed)
-    nulls = np.empty(n_perm)
+    nulls, null_025, null_05 = np.empty(n_perm), np.empty(n_perm), np.empty(n_perm)
     for i in range(n_perm):
         fake = k["c"].to_numpy() + rng.permutation(off) * k["e"].to_numpy()
-        nulls[i] = np.median(np.abs(k["x"].to_numpy() - fake) / k["e"].to_numpy())
+        d_fake = np.abs(k["x"].to_numpy() - fake) / k["e"].to_numpy()
+        nulls[i], null_025[i], null_05[i] = np.median(d_fake), (d_fake <= 0.25).mean(), (d_fake <= 0.5).mean()
     obs = float(np.median(d_real))
     return {"dias": len(k), "mediana_EM": round(obs, 3), "mediana_si_fuera_azar": round(float(nulls.mean()), 3),
-            "dentro_0.25EM_%": round(100 * float((d_real <= 0.25).mean()), 1), "dentro_0.5EM_%": round(100 * float((d_real <= 0.5).mean()), 1),
+            "dentro_0.25EM_%": round(100 * float((d_real <= 0.25).mean()), 1), "azar_0.25EM_%": round(100 * float(null_025.mean()), 1),
+            "dentro_0.5EM_%": round(100 * float((d_real <= 0.5).mean()), 1), "azar_0.5EM_%": round(100 * float(null_05.mean()), 1),
             "p_valor": round(float((nulls <= obs).mean()), 3)}
 
 

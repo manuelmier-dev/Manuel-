@@ -1,7 +1,7 @@
 import unittest
 from datetime import date
 
-from bot.ts_orders import SIM_BASE, SafetyError, assert_sim_account, es_front_symbol, list_accounts, order_body, third_friday
+from bot.ts_orders import SIM_BASE, far_limit_price, SafetyError, assert_sim_account, es_front_symbol, list_accounts, order_body, third_friday
 
 
 class TestTsOrders(unittest.TestCase):
@@ -26,6 +26,11 @@ class TestTsOrders(unittest.TestCase):
         self.assertEqual(es_front_symbol(date(2026, 9, 8)), "ESU26")                 # antes de la rodada
         self.assertEqual(es_front_symbol(date(2026, 9, 11)), "ESZ26")                # 7 días antes del 18-sep: ya rodó
         self.assertEqual(es_front_symbol(date(2026, 12, 15)), "ESH27")
+
+    def test_far_limit_price_is_far_below_and_on_tick(self):
+        p = far_limit_price(7743.13)
+        self.assertEqual(p, 7443.25)
+        self.assertEqual(p % 0.25, 0.0)
 
     def test_list_accounts_reports_errors(self):
         self.assertEqual(list_accounts("t", fetch=lambda m, p, t: (200, {"Accounts": [{"AccountID": "SIM1"}]}))[0]["AccountID"], "SIM1")

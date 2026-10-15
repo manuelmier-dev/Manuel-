@@ -10,6 +10,7 @@ Seguridad (se comprueba en el código y en las pruebas):
   - Cantidad máxima: 1 contrato.
 Uso (en el servidor; el token se lee del archivo, no se imprime):
   python -m bot.ts_orders cuentas   <ts_tokens.json>
+  python -m bot.ts_orders confirmar <ts_tokens.json> <cuenta SIM>   # pide a la API VALIDAR una compra lejana de 1 ES; no envía la orden
 """
 import json
 import sys
@@ -63,6 +64,11 @@ def order_body(account_id: str, symbol: str, side: str, order_type: str, qty: in
     return body
 
 
+def far_limit_price(last: float, pts: float = 300.0, tick: float = 0.25) -> float:
+    """Precio de compra muy por debajo del mercado: una orden de prueba que NO se ejecutaría aunque se enviara."""
+    return round((last - pts) / tick) * tick
+
+
 def call(method: str, path: str, token: str, body: dict | None = None, timeout: int = 60) -> tuple[int, dict]:
     url = SIM_BASE + path                                            # siempre el simulador
     data = json.dumps(body).encode() if body is not None else None
@@ -100,3 +106,21 @@ if __name__ == "__main__":
         print(f"Cuentas visibles en el simulador: {len(accts)}   |   contrato ES vigente hoy: {es_front_symbol(date.today())}")
         for a in accts:
             print({k: a.get(k) for k in ("AccountID", "AccountType", "Status", "Currency")})
+    elif cmd == "confirmar":
+        from datetime import datetime, timezone
+
+        import pandas as pd
+
+        from .ts_bars import build_url, fetch_json
+        account = assert_sim_account(sys.argv[3])
+        st, payload = fetch_json(build_url("@ES", pd.Timestamp(datetime.now(timezone.utc)), barsback=1), token)
+        bars = payload.get("Bars") or []
+        if st != 200 or not bars:
+            print(f"No pude leer el precio actual de ES (HTTP {st}).")
+            sys.exit(1)
+        last = float(bars[-1]["Close"])
+        symbol = es_front_symbol(date.today())
+        body = order_body(account, symbol, "BUY", "Limit", limit=far_limit_price(last))
+        print(f"Precio de ES ahora: {last}.  Pido VALIDAR (no enviar): {body}")
+        status, answer = call("POST", "/orderexecution/orderconfirm", token, body)
+        print(f"HTTP {status}: {json.dumps(answer)[:600]}")
