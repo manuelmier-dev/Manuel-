@@ -71,13 +71,15 @@ def _levels(next_open, side, call_w, put_w, em, p: Params):
     return entry, stop, target, d
 
 
-def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params()):
-    errs = validate_bars(bars) + validate_days(days)
+def run_backtest(bars: pd.DataFrame, days: pd.DataFrame, p: Params = Params(), by_day: dict | None = None):
+    """`by_day` (opcional): las barras con indicadores ya agrupadas por día; sirve para repetir el backtest muchas veces sin recalcular."""
+    errs = validate_days(days) + (validate_bars(bars) if by_day is None else [])
     if errs:
         raise ValueError("Datos inválidos:\n- " + "\n- ".join(errs))
 
-    ind = add_indicators(bars, p)
-    by_day = {d: g for d, g in ind.groupby(ind.index.date)}
+    if by_day is None:
+        ind = add_indicators(bars, p)
+        by_day = {d: g for d, g in ind.groupby(ind.index.date)}
     trades, skipped = [], []
 
     for key, day in days.iterrows():
