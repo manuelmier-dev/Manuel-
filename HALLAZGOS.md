@@ -44,3 +44,9 @@ Descarga de Theta (historia 0DTE) y de ES por la API de TradeStation; backtest c
 - **Piloto (42 días, 2026-08-14 a 2026-10-13; 60% del volumen clasificado):** F1 -4 USD/op (t -0.02), F2 -54 (t -0.29), F3 +18 (t 0.06, n=15), F4 n=8 (sin datos suficientes). Salida 2 h: igual, nada. Ninguna cumple la barra (|t|>2.7). Con 42 días solo se detectarían efectos de varios cientos de USD por día; el piloto NO descarta efectos pequeños, solo muestra que no hay uno grande y obvio. Siguiente: probar velocidad en días de 2026-01..08 y ampliar.
 - Confirmado por Manuel (16-oct): las horas 7:30 y 10:30 de su estrategia son de Nueva York.
 - Potencia (SD diaria ~1,200 USD): para |t|>2.7 hace falta un promedio por operación de ~500 USD con 42 días, ~260 con 150, ~185 con 300 y ~120 con 730.
+
+## Estrategia 0DTE de cierre, Etapa 1 (16-oct-2026; ES como sustituto del SPX; 940 días de data_hist)
+- Señales de las 15:45 vs movimiento 15:45-16:00 (Z = entre mediana de 20 días previos). Barra pre-registrada: p<0.005 y 3 tercios con el signo previsto.
+- RELACIÓN (8 de 10): S1_gex rho -0.11 (mov) / -0.22 (rango); S3_rng +0.25 / +0.53; S5_vol +0.25 / +0.52; S6_imp +0.16 / +0.31. SIN RELACIÓN: S2_dist (distancia a la pared de OI), rho ~0.
+- Lectura honesta: S3, S5, S6 son agrupamiento de volatilidad (un día/tramo movido sigue movido) y miden casi lo mismo; el precio de la opción a las 15:45 ya lo descuenta. Que el movimiento sea predecible NO es ventaja: la ventaja exige que lo previsto supere lo que cuesta la prima (Etapa 2). Además los valores p suponen días independientes y hay autocorrelación, así que están exagerados.
+- Pared de OI (S2): no predice nada; la hipótesis de "pinning" por distancia a la pared no se sostiene con este dato.
