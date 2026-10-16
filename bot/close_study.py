@@ -72,6 +72,21 @@ def evaluate(d: pd.DataFrame, n_perm: int = 5000, seed: int = 11) -> pd.DataFram
     return pd.DataFrame(rows)
 
 
+def partial_rank(d: pd.DataFrame, sig: str, control: str, out: str, n_perm: int = 5000, seed: int = 13) -> dict:
+    """EXPLORATORIO (no es regla pre-registrada): correlación de rangos entre `sig` y `out` quitando el efecto de `control`
+    (p. ej. ¿el GEX aporta algo una vez descontada la volatilidad previa S3?). p por permutación de los residuos."""
+    x = d[[sig, control, out]].dropna()
+    r = x.rank()
+    def resid(y, z):
+        b = np.polyfit(z, y, 1)
+        return y - np.polyval(b, z)
+    a, b_ = resid(r[sig].to_numpy(), r[control].to_numpy()), resid(r[out].to_numpy(), r[control].to_numpy())
+    rho = float(np.corrcoef(a, b_)[0, 1])
+    rng = np.random.default_rng(seed)
+    perm = np.array([np.corrcoef(a, rng.permutation(b_))[0, 1] for _ in range(n_perm)])
+    return {"señal": sig, "control": control, "resultado": out, "n": len(x), "rho_parcial": rho, "p_azar": float((np.abs(perm) >= abs(rho)).mean())}
+
+
 def build(folder, bars: pd.DataFrame) -> pd.DataFrame:
     from .days import build_days
     from .loaders import summarize_folder
@@ -88,4 +103,6 @@ if __name__ == "__main__":
     if len(d):
         pd.set_option("display.width", 220)
         print(evaluate(d).to_string(index=False))
+        print("\nEXPLORATORIO (no es regla): efecto de cada señal quitando la volatilidad previa (S3_rng)")
+        print(pd.DataFrame([partial_rank(d, sg, "S3_rng", o) for sg in ("S1_gex", "S2_dist", "S6_imp") for o in OUTCOMES]).to_string(index=False))
         print(f"\nBarra: p < {P_BAR:.4f} ({N_TESTS} pruebas) Y 3 tercios con el signo previsto. Sin relación aquí = no se pasa a la Etapa 2.")

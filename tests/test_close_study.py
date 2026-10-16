@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from bot.close_study import evaluate, normalize, raw_day_features
+from bot.close_study import evaluate, normalize, partial_rank, raw_day_features
 
 NY = "America/New_York"
 
@@ -40,6 +40,14 @@ class TestCloseStudy(unittest.TestCase):
         res = evaluate(normalize(pd.DataFrame(rows)), n_perm=300).set_index(["señal", "resultado"])
         self.assertEqual(res.loc[("S1_gex", "Z_mov"), "veredicto"], "RELACIÓN")
         self.assertEqual(res.loc[("S3_rng", "Z_mov"), "veredicto"], "SIN RELACIÓN")
+
+    def test_partial_removes_the_common_driver(self):
+        rng = np.random.default_rng(5)
+        vol = rng.normal(size=400)
+        d = pd.DataFrame({"S1_gex": -vol + rng.normal(0, 0.3, 400), "S3_rng": vol + rng.normal(0, 0.02, 400), "Z_mov": vol + rng.normal(0, 0.3, 400)})
+        self.assertGreater(abs(np.corrcoef(d["S1_gex"].rank(), d["Z_mov"].rank())[0, 1]), 0.6)        # parece predecir
+        res = partial_rank(d, "S1_gex", "S3_rng", "Z_mov", n_perm=200)
+        self.assertLess(abs(res["rho_parcial"]), 0.35)                                               # pero casi todo era volatilidad común
 
     def test_normalization_does_not_peek(self):
         df = pd.DataFrame({"date": pd.bdate_range("2024-01-01", periods=30), "S1_gex": 0.0, "S2_dist": 1.0, "S3_rng": 1.0, "S5_vol": 1.0,
