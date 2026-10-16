@@ -42,3 +42,5 @@ Descarga de Theta (historia 0DTE) y de ES por la API de TradeStation; backtest c
 - Es un PROXY: signo inferido por precio vs bid/ask (Lee-Ready simplificado); el inventario real del dealer no es observable.
 - Sin resultados todavía (falta bajar los datos con `bot/flow.py`).
 - **Piloto (42 días, 2026-08-14 a 2026-10-13; 60% del volumen clasificado):** F1 -4 USD/op (t -0.02), F2 -54 (t -0.29), F3 +18 (t 0.06, n=15), F4 n=8 (sin datos suficientes). Salida 2 h: igual, nada. Ninguna cumple la barra (|t|>2.7). Con 42 días solo se detectarían efectos de varios cientos de USD por día; el piloto NO descarta efectos pequeños, solo muestra que no hay uno grande y obvio. Siguiente: probar velocidad en días de 2026-01..08 y ampliar.
+- Confirmado por Manuel (16-oct): las horas 7:30 y 10:30 de su estrategia son de Nueva York.
+- Potencia (SD diaria ~1,200 USD): para |t|>2.7 hace falta un promedio por operación de ~500 USD con 42 días, ~260 con 150, ~185 con 300 y ~120 con 730.
